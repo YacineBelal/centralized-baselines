@@ -139,7 +139,6 @@ def patient_leave_out_split(nb_patient, mode="design", test_size=0.2, val_size=0
     design : (train, val, test)
     final  : (train, test)
     """
-    assert mode in ("design", "final"), f"mode must be 'design' or 'final', got {repr(mode)}"
     indices = np.arange(nb_patient)
     if rng is not None:
         indices = rng.permutation(indices)

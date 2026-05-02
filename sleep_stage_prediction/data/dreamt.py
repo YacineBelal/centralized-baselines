@@ -20,6 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
     # TODO: a dataclass to encapsulate rng etc
     # TODO: seed should be saved here too
+    assert mode in ("design", "final"), f"mode must be 'design' or 'final', got {repr(mode)}"
     path = PROJECT_ROOT / "data" / "processed" / "dreamt"
     X_train = []
     X_test = []
