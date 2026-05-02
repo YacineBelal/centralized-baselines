@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .utils import cache_exists, federate_data, multimodal_cache_exists, patient_leave_out_split
+from .utils import cache_exists, multimodal_cache_exists, patient_leave_out_split
 
 COLS_TO_DROP = [
     "TIMESTAMP",
@@ -21,6 +21,7 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42):
     # TODO: a dataclass to encapsulate rng etc
     # TODO: seed should be saved here too
     path = PROJECT_ROOT / "data" / "processed" / "dreamt"
+    test_dir = path / "test"
     X_train = []
     X_test = []
     y_train = []
@@ -29,9 +30,10 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42):
         for idx in range(nb_patients):
             client_path = path / f"client_{idx}"
             X_train.append(np.load(client_path / "train_data.npy"))
-            X_test.append(np.load(client_path / "test_data.npy"))
             y_train.append(np.load(client_path / "train_target.npy"))
-            y_test.append(np.load(client_path / "test_target.npy"))
+
+        X_test = np.load(test_dir / "test_data.npy")
+        y_test = np.load(test_dir / "test_target.npy")
 
     else:
         rng = np.random.default_rng(seed=seed)
@@ -41,16 +43,29 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42):
             frequency,
         )
         signals_preprocessed, labels_preprocessed = _preprocess_dreamt(signals, labels)
-        split_data = federate_data(signals_preprocessed, labels_preprocessed, "dreamt", rng)
+        train_idx, test_idx = patient_leave_out_split(nb_patients, test_size=0.2, rng=rng)
 
-        for client_data in split_data:
-            X_train.append(client_data[0])
-            X_test.append(client_data[1])
-            y_train.append(client_data[2])
-            y_test.append(client_data[3])
+        from utils import save_data_array
 
-    X_train = np.concat(X_train, axis=0)
-    y_train = np.concat(y_train, axis=0)
+        for idx in enumerate(train_idx):
+            client_dir = path / f"client{idx}"
+            save_data_array(client_dir / "train_data", signals_preprocessed[train_idx])
+            save_data_array(client_dir / "train_target", labels_preprocessed[train_idx])
+            X_train.append(signals_preprocessed[train_idx])
+            y_train.append(signals_preprocessed[train_idx])
+
+        for idx in enumerate(test_idx):
+            X_test.append(signals_preprocessed[test_idx])
+            y_test.append(signals_preprocessed[test_idx])
+
+        test_dir = path / "test"
+        save_data_array(test_dir / "test_data", signals_preprocessed[test_idx])
+        save_data_array(test_dir / "test_target", labels_preprocessed[test_idx])
+
+        X_train = np.concat(X_train)
+        y_train = np.concat(y_train)
+        X_test = np.concat(X_test)
+        y_test = np.concat(y_test)
 
     return X_train, X_test, y_train, y_test
 

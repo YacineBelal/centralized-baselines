@@ -101,11 +101,14 @@ def federate_data(X, y, dataset_name, rng, test_size=0.2):
 
 
 def cache_exists(cache_dir, nb_patients):
-    return all(
+    train_ok = all(
         (cache_dir / f"client_{i}" / f"{split}.npy").exists()
         for i in range(nb_patients)
         for split in ("train_data", "train_target", "test_data", "test_target")
     )
+
+    test_ok = all((cache_dir / "test" / f"{mod}.npy").exists() for mod in ["data", "target"])
+    return train_ok and test_ok
 
 
 def patient_leave_out_split(nb_patients, test_size=0.2, rng=None):
