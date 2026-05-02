@@ -6,8 +6,8 @@ import pandas as pd
 from .utils import cache_exists, federate_data, multimodal_cache_exists, patient_leave_out_split
 
 COLS_TO_DROP = [
-    "IBI",
     "TIMESTAMP",
+    "IBI",
     "Obstructive_Apnea",
     "Central_Apnea",
     "Hypopnea",
@@ -73,9 +73,8 @@ def _load_dreamt(
     for _ in range(nb_patients):
         patient_file = patient_file_list.pop()
         df = pd.read_csv(patient_file)
-        df["Sleep_Stage"] = df["Sleep_Stage"].replace("P", "W")
         df = df.drop(columns=COLS_TO_DROP)
-        df = df[df["Sleep_Stage"] != "Missing"]
+        df = df[~df["Sleep_Stage"].isin(["P", "Missing"])]
         labels.append(df["Sleep_Stage"].to_numpy())
         signals.append(df.drop(columns=["Sleep_Stage"]).to_numpy())
 
