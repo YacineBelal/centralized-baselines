@@ -21,7 +21,6 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
     # TODO: a dataclass to encapsulate rng etc
     # TODO: seed should be saved here too
     path = PROJECT_ROOT / "data" / "processed" / "dreamt"
-    test_dir = path / "test"
     X_train = []
     X_test = []
     y_train = []
@@ -32,8 +31,8 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
             X_train.append(np.load(client_path / "train_data.npy"))
             y_train.append(np.load(client_path / "train_target.npy"))
 
-        X_test = np.load(test_dir / "test_data.npy")
-        y_test = np.load(test_dir / "test_target.npy")
+        X_test = np.load(path / "test_data.npy")
+        y_test = np.load(path / "test_target.npy")
 
     else:
         rng = np.random.default_rng(seed=seed)
@@ -49,31 +48,33 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
 
         from utils import save_data_array
 
-        for idx in range(len(train_idx)):
-            client_dir = path / f"client{idx}"
-            save_data_array(client_dir / "data", signals_preprocessed[idx])
-            save_data_array(client_dir / "target", labels_preprocessed[idx])
-            X_train.append(signals_preprocessed[idx])
-            y_train.append(signals_preprocessed[idx])
+        for i in range(len(train_idx)):
+            client_dir = path / f"client{i}"
+            save_data_array(client_dir / "train_data", signals_preprocessed[i])
+            save_data_array(client_dir / "train_target", labels_preprocessed[i])
+            X_train.append(signals_preprocessed[i])
+            y_train.append(signals_preprocessed[i])
 
-        X_test = np.concatenate([signals_preprocessed[idx] for idx in test_idx])
-        y_test = np.concatenate([signals_preprocessed[idx] for idx in test_idx])
+        X_test = np.concatenate([signals_preprocessed[i] for i in test_idx])
+        y_test = np.concatenate([signals_preprocessed[i] for i in test_idx])
 
         if splits.val is not None:
-            test_dir = path / "val"
-            X_val = np.concatenate([signals_preprocessed[idx] for idx in splits.val])
-            y_val = np.concatenate([labels_preprocessed[idx] for idx in splits.val])
-            save_data_array(test_dir / "data", X_val)
-            save_data_array(test_dir / "target", y_val)
+            X_val = np.concatenate([signals_preprocessed[i] for i in splits.val])
+            y_val = np.concatenate([labels_preprocessed[i] for i in splits.val])
+            save_data_array(path / "val_data", X_val)
+            save_data_array(path / "val_target", y_val)
 
-        test_dir = path / "test"
-        save_data_array(test_dir / "data", X_test)
-        save_data_array(test_dir / "target", y_test)
+        save_data_array(path / "test_data", X_test)
+        save_data_array(path / "test_target", y_test)
 
         X_train = np.concatenate(X_train)
         y_train = np.concatenate(y_train)
 
-    return X_train, X_test, y_train, y_test
+    return {
+        "train": (X_train, y_train),
+        "test": (X_test, y_test),
+        "val": (X_val, y_val) if splits.val is not None else None,
+    }
 
 
 def _load_dreamt(
@@ -102,7 +103,7 @@ def _load_dreamt(
     return signals, labels
 
 
-def load_dreamt_multimodal(nb_patients, frequency=64, seed=42):
+def load_dreamt_multimodal(nb_patients, frequency=64, seed=42, mode="design"):
     """Load DREAMT with a patient leave-out split and sensor-specific resolutions.
 
     20% of patients are held out as a shared test set; the remaining 80% form
@@ -126,7 +127,9 @@ def load_dreamt_multimodal(nb_patients, frequency=64, seed=42):
     signals, labels = _load_dreamt(nb_patients, rng, frequency)
     bvps, accs, eda_temps, hrs, ys = _preprocess_dreamt_multimodal(signals, labels)
 
-    train_idx, test_idx = patient_leave_out_split(nb_patients, test_size=0.2, rng=rng)
+    splits = patient_leave_out_split(nb_patients, mode, test_size=0.2, rng=rng)
+    train_idx = splits.train
+    test_idx = splits.test
     nb_train = len(train_idx)
 
     if multimodal_cache_exists(path, nb_train):
@@ -135,11 +138,11 @@ def load_dreamt_multimodal(nb_patients, frequency=64, seed=42):
         X_eda_temp_train = [np.load(path / f"client_{i}" / "train_eda_temp.npy") for i in range(nb_train)]
         X_hr_train = [np.load(path / f"client_{i}" / "train_hr.npy") for i in range(nb_train)]
         y_train = [np.load(path / f"client_{i}" / "train_target.npy") for i in range(nb_train)]
-        X_bvp_test = np.load(path / "test" / "bvp.npy")
-        X_acc_test = np.load(path / "test" / "acc.npy")
-        X_eda_temp_test = np.load(path / "test" / "eda_temp.npy")
-        X_hr_test = np.load(path / "test" / "hr.npy")
-        y_test = np.load(path / "test" / "target.npy")
+        X_bvp_test = np.load(path / "test_bvp.npy")
+        X_acc_test = np.load(path / "test_acc.npy")
+        X_eda_temp_test = np.load(path / "test_eda_temp.npy")
+        X_hr_test = np.load(path / "test_hr.npy")
+        y_test = np.load(path / "test_target.npy")
     else:
         from .utils import save_data_array
 
@@ -163,25 +166,31 @@ def load_dreamt_multimodal(nb_patients, frequency=64, seed=42):
         X_hr_test = np.concatenate([hrs[i] for i in test_idx])
         y_test = np.concatenate([ys[i] for i in test_idx])
 
-        test_dir = path / "test"
-        save_data_array(test_dir / "bvp", X_bvp_test)
-        save_data_array(test_dir / "acc", X_acc_test)
-        save_data_array(test_dir / "eda_temp", X_eda_temp_test)
-        save_data_array(test_dir / "hr", X_hr_test)
-        save_data_array(test_dir / "target", y_test)
+        save_data_array(path / "test_bvp", X_bvp_test)
+        save_data_array(path / "test_acc", X_acc_test)
+        save_data_array(path / "test_eda_temp", X_eda_temp_test)
+        save_data_array(path / "test_hr", X_hr_test)
+        save_data_array(path / "test_target", y_test)
 
-    return (
-        np.concatenate(X_bvp_train),
-        np.concatenate(X_acc_train),
-        np.concatenate(X_eda_temp_train),
-        np.concatenate(X_hr_train),
-        np.concatenate(y_train),
-        X_bvp_test,
-        X_acc_test,
-        X_eda_temp_test,
-        X_hr_test,
-        y_test,
-    )
+        if splits.val is not None:
+            X_bvp_val = np.concatenate([bvps[i] for i in splits.val])
+            X_acc_val = np.concatenate([accs[i] for i in splits.val])
+            X_eda_temp_val = np.concatenate([eda_temps[i] for i in splits.val])
+            X_hr_val = np.concatenate([hrs[i] for i in splits.val])
+            y_val = np.concatenate([ys[i] for i in splits.val])
+            save_data_array(path / "val_bvp", X_bvp_val)
+            save_data_array(path / "val_acc", X_acc_val)
+            save_data_array(path / "val_eda_temp", X_eda_temp_val)
+            save_data_array(path / "val_hr", X_hr_val)
+            save_data_array(path / "val_target", y_val)
+
+    return {
+        "train": (X_bvp_train, X_acc_train, X_eda_temp_train, X_hr_train, y_train),
+        "test": (X_bvp_train, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
+        "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val)
+        if splits.val is not None
+        else None,
+    }
 
 
 def _preprocess_dreamt_multimodal(signals, labels):
