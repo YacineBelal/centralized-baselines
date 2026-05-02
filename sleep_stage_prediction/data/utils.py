@@ -112,15 +112,22 @@ def federate_data(X, y, dataset_name, rng, test_size=0.2):
     return split_data
 
 
-def cache_exists(cache_dir, nb_patients):
+def cache_exists(cache_dir, nb_patients, mode="design"):
     train_ok = all(
         (cache_dir / f"client_{i}" / f"{split}.npy").exists()
         for i in range(nb_patients)
-        for split in ("data", "target")
+        for split in ("train_data", "train_target")
     )
 
-    test_ok = all((cache_dir / "test" / f"{mod}.npy").exists() for mod in ["data", "target"])
-    return train_ok and test_ok
+    test_ok = all((cache_dir / f"{mod}.npy").exists() for mod in ["test_data", "test_target"])
+
+    val_ok = (
+        all((cache_dir / f"{mod}.npy").exists() for mod in ["test_data", "test_target"])
+        if mode == "design"
+        else True
+    )
+
+    return train_ok and test_ok and val_ok
 
 
 def patient_leave_out_split(nb_patient, mode="design", test_size=0.2, val_size=0.1, rng=None):
@@ -148,7 +155,7 @@ def patient_leave_out_split(nb_patient, mode="design", test_size=0.2, val_size=0
     )
 
 
-def multimodal_cache_exists(cache_dir, nb_train_patients):
+def multimodal_cache_exists(cache_dir, nb_train_patients, mode="design"):
     """Check all multi-modal npy files exist for train clients and shared test set."""
     train_ok = all(
         (cache_dir / f"client_{i}" / f"train_{mod}.npy").exists()
@@ -156,7 +163,16 @@ def multimodal_cache_exists(cache_dir, nb_train_patients):
         for mod in ("bvp", "acc", "eda_temp", "hr", "target")
     )
     test_ok = all(
-        (cache_dir / "test" / f"{mod}.npy").exists()
-        for mod in ("bvp", "acc", "eda_temp", "hr", "target")
+        (cache_dir / f"{mod}.npy").exists()
+        for mod in ("test_bvp", "test_acc", "test_eda_temp", "test_hr", "test_target")
     )
-    return train_ok and test_ok
+
+    val_ok = (
+        all(
+            (cache_dir / f"{mod}.npy").exists()
+            for mod in ("val_bvp", "val_acc", "val_eda_temp", "val_hr", "val_target")
+        )
+        if mode == "design"
+        else True
+    )
+    return train_ok and test_ok and val_ok
