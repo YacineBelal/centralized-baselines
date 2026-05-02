@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -12,6 +13,17 @@ __all__ = [
 ]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+@dataclass
+class DataSplit:
+    train: np.ndarray
+    test: np.ndarray
+    val: np.ndarray | None = None
+
+    @property
+    def is_final(self):
+        return self.val is None
 
 
 class Workflow(Enum):
@@ -104,20 +116,36 @@ def cache_exists(cache_dir, nb_patients):
     train_ok = all(
         (cache_dir / f"client_{i}" / f"{split}.npy").exists()
         for i in range(nb_patients)
-        for split in ("train_data", "train_target", "test_data", "test_target")
+        for split in ("data", "target")
     )
 
     test_ok = all((cache_dir / "test" / f"{mod}.npy").exists() for mod in ["data", "target"])
     return train_ok and test_ok
 
 
-def patient_leave_out_split(nb_patients, test_size=0.2, rng=None):
-    """Return (train_indices, test_indices) for a patient-level random split."""
-    indices = np.arange(nb_patients)
+def patient_leave_out_split(nb_patient, mode="design", test_size=0.2, val_size=0.1, rng=None):
+    """
+    Split patient indices into train/test (final mode) or train/val/test (design mode).
+
+    Returns
+    -------
+    design : (train, val, test)
+    final  : (train, test)
+    """
+    assert mode in ("design", "final"), f"mode must be 'design' or 'final', got {repr(mode)}"
+    indices = np.arange(nb_patient)
     if rng is not None:
         indices = rng.permutation(indices)
-    n_test = max(1, int(nb_patients * test_size))
-    return indices[n_test:], indices[:n_test]
+    n_test = max(1, int(nb_patient * test_size))
+    if mode == "final":
+        return DataSplit(indices[n_test:], indices[:n_test])
+
+    n_val = max(1, int(val_size * nb_patient))
+    return DataSplit(
+        train=indices[n_test + n_val :],
+        test=indices[:n_test],
+        val=indices[n_test : n_test + n_val],
+    )
 
 
 def multimodal_cache_exists(cache_dir, nb_train_patients):

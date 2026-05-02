@@ -17,7 +17,7 @@ COLS_TO_DROP = [
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # TODO: remove workflow if not used
-def load_dreamt(nb_patients, workflow, frequency=64, seed=42):
+def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
     # TODO: a dataclass to encapsulate rng etc
     # TODO: seed should be saved here too
     path = PROJECT_ROOT / "data" / "processed" / "dreamt"
@@ -43,29 +43,35 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42):
             frequency,
         )
         signals_preprocessed, labels_preprocessed = _preprocess_dreamt(signals, labels)
-        train_idx, test_idx = patient_leave_out_split(nb_patients, test_size=0.2, rng=rng)
+        splits = patient_leave_out_split(nb_patients, mode, test_size=0.2, rng=rng)
+        train_idx = splits.train
+        test_idx = splits.test
 
         from utils import save_data_array
 
-        for idx in enumerate(train_idx):
+        for idx in range(len(train_idx)):
             client_dir = path / f"client{idx}"
-            save_data_array(client_dir / "train_data", signals_preprocessed[train_idx])
-            save_data_array(client_dir / "train_target", labels_preprocessed[train_idx])
-            X_train.append(signals_preprocessed[train_idx])
-            y_train.append(signals_preprocessed[train_idx])
+            save_data_array(client_dir / "data", signals_preprocessed[idx])
+            save_data_array(client_dir / "target", labels_preprocessed[idx])
+            X_train.append(signals_preprocessed[idx])
+            y_train.append(signals_preprocessed[idx])
 
-        for idx in enumerate(test_idx):
-            X_test.append(signals_preprocessed[test_idx])
-            y_test.append(signals_preprocessed[test_idx])
+        X_test = np.concatenate([signals_preprocessed[idx] for idx in test_idx])
+        y_test = np.concatenate([signals_preprocessed[idx] for idx in test_idx])
+
+        if splits.val is not None:
+            test_dir = path / "val"
+            X_val = np.concatenate([signals_preprocessed[idx] for idx in splits.val])
+            y_val = np.concatenate([labels_preprocessed[idx] for idx in splits.val])
+            save_data_array(test_dir / "data", X_val)
+            save_data_array(test_dir / "target", y_val)
 
         test_dir = path / "test"
-        save_data_array(test_dir / "test_data", signals_preprocessed[test_idx])
-        save_data_array(test_dir / "test_target", labels_preprocessed[test_idx])
+        save_data_array(test_dir / "data", X_test)
+        save_data_array(test_dir / "target", y_test)
 
-        X_train = np.concat(X_train)
-        y_train = np.concat(y_train)
-        X_test = np.concat(X_test)
-        y_test = np.concat(y_test)
+        X_train = np.concatenate(X_train)
+        y_train = np.concatenate(y_train)
 
     return X_train, X_test, y_train, y_test
 
