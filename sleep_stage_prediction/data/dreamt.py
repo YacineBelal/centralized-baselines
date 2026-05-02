@@ -59,22 +59,27 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
         X_test = np.concatenate([signals_preprocessed[i] for i in test_idx])
         y_test = np.concatenate([signals_preprocessed[i] for i in test_idx])
 
-        if splits.val is not None:
-            X_val = np.concatenate([signals_preprocessed[i] for i in splits.val])
-            y_val = np.concatenate([labels_preprocessed[i] for i in splits.val])
-            save_data_array(path / "val_data", X_val)
-            save_data_array(path / "val_target", y_val)
-
         save_data_array(path / "test_data", X_test)
         save_data_array(path / "test_target", y_test)
 
         X_train = np.concatenate(X_train)
         y_train = np.concatenate(y_train)
 
+        if splits.val is not None:
+            X_val = np.concatenate([signals_preprocessed[i] for i in splits.val])
+            y_val = np.concatenate([labels_preprocessed[i] for i in splits.val])
+            save_data_array(path / "val_data", X_val)
+            save_data_array(path / "val_target", y_val)
+
+        return {
+            "train": (X_train, y_train),
+            "test": (X_test, y_test),
+            "val": (X_val, y_val) if splits.val is not None else None,
+        }
+
     return {
         "train": (X_train, y_train),
         "test": (X_test, y_test),
-        "val": (X_val, y_val) if splits.val is not None else None,
     }
 
 
@@ -136,7 +141,9 @@ def load_dreamt_multimodal(nb_patients, frequency=64, seed=42, mode="design"):
     if multimodal_cache_exists(path, nb_train):
         X_bvp_train = [np.load(path / f"client_{i}" / "train_bvp.npy") for i in range(nb_train)]
         X_acc_train = [np.load(path / f"client_{i}" / "train_acc.npy") for i in range(nb_train)]
-        X_eda_temp_train = [np.load(path / f"client_{i}" / "train_eda_temp.npy") for i in range(nb_train)]
+        X_eda_temp_train = [
+            np.load(path / f"client_{i}" / "train_eda_temp.npy") for i in range(nb_train)
+        ]
         X_hr_train = [np.load(path / f"client_{i}" / "train_hr.npy") for i in range(nb_train)]
         y_train = [np.load(path / f"client_{i}" / "train_target.npy") for i in range(nb_train)]
         X_bvp_test = np.load(path / "test_bvp.npy")
@@ -185,12 +192,15 @@ def load_dreamt_multimodal(nb_patients, frequency=64, seed=42, mode="design"):
             save_data_array(path / "val_hr", X_hr_val)
             save_data_array(path / "val_target", y_val)
 
+        return {
+            "train": (X_bvp_train, X_acc_train, X_eda_temp_train, X_hr_train, y_train),
+            "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
+            "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val),
+        }
+
     return {
         "train": (X_bvp_train, X_acc_train, X_eda_temp_train, X_hr_train, y_train),
-        "test": (X_bvp_train, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
-        "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val)
-        if splits.val is not None
-        else None,
+        "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
     }
 
 
