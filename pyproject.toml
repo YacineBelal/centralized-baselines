@@ -16,6 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License"
 ]
 dependencies = [
+    "fire>=0.7.1",
     "jupyterlab>=4.5.5",
     "matplotlib>=3.10.8",
     "mlflow>=1.27.0",
