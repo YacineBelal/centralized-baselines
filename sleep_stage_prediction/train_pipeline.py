@@ -13,13 +13,13 @@ from sleep_stage_prediction.models import (
 
 
 def main(
-    nb_patients=10,
+    nb_patients=100,
     frequency=64,
     test_size=0.2,
-    val_size=0.2,
+    val_size=0.1,
     n_fft=32,
-    epochs=1,
-    batch_size=128,
+    epochs=50,
+    batch_size=32,
     lr=0.001,
     mode="design",
     seed=42,
