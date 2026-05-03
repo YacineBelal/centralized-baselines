@@ -191,15 +191,26 @@ def load_dreamt_multimodal(nb_patients, frequency=64, seed=42, mode="design"):
             save_data_array(path / "val_eda_temp", X_eda_temp_val)
             save_data_array(path / "val_hr", X_hr_val)
             save_data_array(path / "val_target", y_val)
-
-        return {
-            "train": (X_bvp_train, X_acc_train, X_eda_temp_train, X_hr_train, y_train),
-            "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
-            "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val),
-        }
+            return {
+                "train": (
+                    np.concatenate(X_bvp_train),
+                    np.concatenate(X_acc_train),
+                    np.concatenate(X_eda_temp_train),
+                    np.concatenate(X_hr_train),
+                    np.concatenate(y_train),
+                ),
+                "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
+                "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val),
+            }
 
     return {
-        "train": (X_bvp_train, X_acc_train, X_eda_temp_train, X_hr_train, y_train),
+        "train": (
+            np.concatenate(X_bvp_train),
+            np.concatenate(X_acc_train),
+            np.concatenate(X_eda_temp_train),
+            np.concatenate(X_hr_train),
+            np.concatenate(y_train),
+        ),
         "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
     }
 

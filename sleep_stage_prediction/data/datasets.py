@@ -56,12 +56,14 @@ class MultiModalDreamtDataset(Dataset):
                 torch.FloatTensor(self.X_acc[index]),
                 n_fft=self.n_fft,
                 hop_length=self.n_fft // 2,
+                window=self.hann_window,
                 center=False,
                 normalized=True,
                 return_complex=True,
             ).abs()
             ** 2
         )
+
         log_acc_stft = 10 * torch.log(acc_stft + 1e-8)
         return (
             torch.FloatTensor(self.X_bvp[index]),
