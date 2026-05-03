@@ -43,11 +43,17 @@ def train_model(
             empirical_risk += loss.item()
 
         empirical_risk /= len(train_dl.dataset)
-        print(f"Train loss: {empirical_risk}")
+        print(f"Epoch [{epoch + 1}/{epochs}] | Train loss: {empirical_risk:.4f}")
 
         if val_dl is not None and (epoch + 1) % val_period == 0:
-            print("**** Validation Epoch ****")
+            print(f"{'─' * 40}")
+            print(f"  Validation @ epoch {epoch + 1}")
             results = test_model(model, val_dl, criterion, device=device)
+            print(
+                f"  Binary F1:  {results[0]['Binary F1-score']:.4f}  (best: {best_f1_score:.4f}  patience: {tolerated_steps_ctr}/{tolerated_steps})"
+            )
+            print(f"{'─' * 40}")
+
             if results[0]["Binary F1-score"] > best_f1_score:
                 best_f1_score = results[0]["Binary F1-score"]
                 best_model = copy.deepcopy(model.state_dict())
