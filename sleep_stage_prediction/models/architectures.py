@@ -84,13 +84,31 @@ class ResBlock1d(nn.Module):
     def forward(self, x):
         return self.relu(x + self.block(x))
 
+class ResBlock2d(nn.Module):
+    def __init__(self, channels, kernel_size=3):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(
+                channels, channels, kernel_size=(1, kernel_size), padding=(0, kernel_size // 2)
+            ),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(),
+            nn.Conv2d(
+                channels, channels, kernel_size=(1, kernel_size), padding=(0, kernel_size // 2)
+            ),
+            nn.BatchNorm2d(channels),
+        )
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(x + self.block(x))
 
 class MultiScaleCNN(nn.Module):
     """Multi-branch CNN with residual blocks operating on sensor-specific resolutions.
 
     Inputs:
         x_bvp      (B, 1, 1920)  — BVP at 64 Hz
-        x_acc      (B, 3, 960)   — ACC at 32 Hz
+        x_acc      (B, 3, 17, 59)   — Spectogram of ACC at 32 Hz
         x_eda_temp (B, 2, 120)   — EDA+Temp at 4 Hz
         x_hr       (B, 30)       — HR at 1 Hz
     Output: (B, 5) class logits
@@ -119,17 +137,16 @@ class MultiScaleCNN(nn.Module):
         )  # → (B, 128, 30)
 
         self.acc_path = nn.Sequential(
-            nn.BatchNorm1d(3),
-            nn.Conv1d(3, 32, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm1d(32),
+            nn.BatchNorm2d(3),
+            nn.Conv2d(3, 32, kernel_size=(1, 3), padding=(0, 1)),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            nn.MaxPool1d(2),
-            ResBlock1d(32),
-            nn.Conv1d(32, 64, kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(64),
+            nn.MaxPool2d(kernel_size=(1, 2)),
+            ResBlock2d(32),
+            nn.Conv2d(32, 64, kernel_size=(1, 3), stride=(1, 2), padding=(0, 2)),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.MaxPool1d(4),
-            ResBlock1d(64),
+            ResBlock2d(64),
         )  # → (B, 64, 30)
 
         self.eda_temp_path = nn.Sequential(
@@ -143,7 +160,7 @@ class MultiScaleCNN(nn.Module):
         self.hr_bn = nn.BatchNorm1d(1)
 
         self.fc = nn.Sequential(
-            nn.Linear(128 * 30 + 64 * 30 + 16 * 30 + 30, 512),
+            nn.Linear(128 * 30 + 64 * 17 * 16 + 16 * 30 + 30, 512),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(512, 128),
@@ -156,10 +173,10 @@ class MultiScaleCNN(nn.Module):
 
     def _init_weights(self):
         for layer in self.modules():
-            if isinstance(layer, (nn.Conv1d, nn.Linear)):
+            if isinstance(layer, (nn.Conv1d, nn.Conv2d, nn.Linear)):
                 nn.init.kaiming_normal_(layer.weight)
                 nn.init.zeros_(layer.bias)
-            elif isinstance(layer, nn.BatchNorm1d):
+            elif isinstance(layer, (nn.BatchNorm1d, nn.BatchNorm2d)):
                 nn.init.ones_(layer.weight)
                 nn.init.zeros_(layer.bias)
 
