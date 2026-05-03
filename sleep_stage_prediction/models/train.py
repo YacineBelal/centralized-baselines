@@ -1,4 +1,7 @@
+import copy
+
 from evaluate import test_model
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -13,6 +16,7 @@ def train_model(
     epochs,
     val_dl=None,
     val_period=5,
+    tolerated_steps=2,
     device=torch.device("cpu"),
 ):
     """Train a model for a fixed number of epochs.
@@ -22,6 +26,9 @@ def train_model(
     The last element of each batch is always treated as the target; all
     preceding elements are forwarded to the model via ``model(*inputs)``.
     """
+    best_f1_score = -np.inf
+    tolerated_steps_ctr = tolerated_steps
+    best_model = copy.deepcopy(model.state_dict())
     for epoch in tqdm(range(epochs)):
         model.train()
         empirical_risk = 0.0
@@ -41,4 +48,16 @@ def train_model(
         if val_dl is not None and (epoch + 1) % val_period == 0:
             print("**** Validation Epoch ****")
             results = test_model(model, val_dl, criterion, device=device)
-            print(results)
+            if results[0]["Binary F1-score"] > best_f1_score:
+                best_f1_score = results[0]["Binary F1-score"]
+                best_model = copy.deepcopy(model.state_dict())
+                tolerated_steps_ctr = tolerated_steps
+            else:
+                tolerated_steps_ctr -= 1
+
+            if tolerated_steps_ctr == 0:
+                model.load_state_dict(best_model)
+                break
+
+    if val_dl is not None:
+        model.load_state_dict(best_model)

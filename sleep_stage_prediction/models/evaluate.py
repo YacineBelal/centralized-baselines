@@ -15,9 +15,10 @@ def test_model(model, test_dls, criterion, pos_class=4, device=torch.device("cpu
     """
     if isinstance(test_dls, DataLoader):
         test_dls = [test_dls]
+    results = []
 
     for test_dl in test_dls:
-        results = _test_model(model, test_dl, criterion, pos_class, device=device)
+        results.append(_test_model(model, test_dl, criterion, pos_class, device=device))
 
     return results
 
@@ -50,10 +51,10 @@ def _test_model(model, test_dl, criterion, pos_class, device=torch.device("cpu")
     generalization_error /= len(test_dl.dataset)
     accuracy = correct / len(test_dl.dataset)
     f1score = f1_score(y_true, y_pred, average="weighted")
-    pos_f1_score = f1_score(
+    bin_f1_score = f1_score(
         (y_true == pos_class).long(),
         (y_pred == pos_class).long(),
-        average="binary",
+        average="weighted",
     )
     fpr, tpr, _ = roc_curve(y_true, y_score[:, pos_class], pos_label=pos_class)
     auc = roc_auc_score(
@@ -66,7 +67,7 @@ def _test_model(model, test_dl, criterion, pos_class, device=torch.device("cpu")
         "Weighted_gen_error": None,
         "Accuracy": accuracy,
         "Weighted F1-score": f1score,
-        "Binary F1-score": pos_f1_score,
+        "Binary F1-score": bin_f1_score,
         "Binary AUC": auc,
     }
 
