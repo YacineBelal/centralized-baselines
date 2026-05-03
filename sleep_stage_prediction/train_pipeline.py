@@ -15,11 +15,12 @@ from sleep_stage_prediction.models import (
 def main(
     nb_patients=10,
     frequency=64,
+    test_size=0.2,
+    val_size=0.2,
     n_fft=32,
     epochs=10,
     batch_size=128,
     lr=0.001,
-    momentum=0.9,
     mode="design",
     seed=42,
 ):
@@ -32,6 +33,8 @@ def main(
     dataset = load_dreamt_multimodal(
         nb_patients,
         frequency,
+        val_size,
+        test_size,
         seed,
         mode,
     )

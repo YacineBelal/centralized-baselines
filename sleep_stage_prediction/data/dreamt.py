@@ -16,8 +16,7 @@ COLS_TO_DROP = [
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# TODO: remove workflow if not used
-def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
+def load_dreamt(nb_patients, frequency=64, test_size=0.2, val_size=0.1, seed=42, mode="design"):
     # TODO: a dataclass to encapsulate rng etc
     # TODO: seed should be saved here too
     assert mode in ("design", "final"), f"mode must be 'design' or 'final', got {repr(mode)}"
@@ -43,7 +42,9 @@ def load_dreamt(nb_patients, workflow, frequency=64, seed=42, mode="design"):
             frequency,
         )
         signals_preprocessed, labels_preprocessed = _preprocess_dreamt(signals, labels)
-        splits = patient_leave_out_split(nb_patients, mode, test_size=0.2, rng=rng)
+        splits = patient_leave_out_split(
+            nb_patients, mode, test_size=test_size, val_size=val_size, rng=rng
+        )
         train_idx = splits.train
         test_idx = splits.test
 
@@ -109,7 +110,9 @@ def _load_dreamt(
     return signals, labels
 
 
-def load_dreamt_multimodal(nb_patients, frequency=64, seed=42, mode="design"):
+def load_dreamt_multimodal(
+    nb_patients, frequency=64, test_size=0.2, val_size=0.1, seed=42, mode="design"
+):
     """Load DREAMT with a patient leave-out split and sensor-specific resolutions.
 
     20% of patients are held out as a shared test set; the remaining 80% form
@@ -133,7 +136,9 @@ def load_dreamt_multimodal(nb_patients, frequency=64, seed=42, mode="design"):
     signals, labels = _load_dreamt(nb_patients, rng, frequency)
     bvps, accs, eda_temps, hrs, ys = _preprocess_dreamt_multimodal(signals, labels)
 
-    splits = patient_leave_out_split(nb_patients, mode, test_size=0.2, rng=rng)
+    splits = patient_leave_out_split(
+        nb_patients, mode, val_size=val_size, test_size=test_size, rng=rng
+    )
     train_idx = splits.train
     test_idx = splits.test
     nb_train = len(train_idx)
