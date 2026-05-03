@@ -18,8 +18,8 @@ def test_model(model, test_dls, criterion, pos_class=4, device=torch.device("cpu
 
     for test_dl in test_dls:
         results = _test_model(model, test_dl, criterion, pos_class, device=device)
-        print(results)
-    return None
+
+    return results
 
 
 def _test_model(model, test_dl, criterion, pos_class, device=torch.device("cpu")):

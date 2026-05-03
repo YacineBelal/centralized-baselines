@@ -50,12 +50,12 @@ def main(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss(reduction="sum")
 
-    train_model(model, train_dl, optimizer, criterion, epochs, DEVICE)
-
     if mode == "design":
         val_dl = DataLoader(MultiModalDreamtDataset(n_fft=n_fft, *dataset["val"]), batch_size=1024)
+        train_model(model, train_dl, optimizer, criterion, epochs, val_dl=val_dl, device=DEVICE)
+    else:
+        train_model(model, train_dl, optimizer, criterion, epochs, device=DEVICE)
 
-    test_model(model, val_dl, criterion, device=DEVICE)
     test_model(model, test_dl, criterion, device=DEVICE)
 
 

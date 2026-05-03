@@ -1,10 +1,20 @@
+from evaluate import test_model
 import torch
 from tqdm import tqdm
 
 __all__ = ["train_model"]
 
 
-def train_model(model, train_dl, optimizer, criterion, epochs, device=torch.device("cpu")):
+def train_model(
+    model,
+    train_dl,
+    optimizer,
+    criterion,
+    epochs,
+    val_dl=None,
+    val_period=5,
+    device=torch.device("cpu"),
+):
     """Train a model for a fixed number of epochs.
 
     Works with both single-modal loaders (batches of ``(X, y)``) and
@@ -27,3 +37,8 @@ def train_model(model, train_dl, optimizer, criterion, epochs, device=torch.devi
 
         empirical_risk /= len(train_dl.dataset)
         print(f"Train loss: {empirical_risk}")
+
+        if val_dl is not None and (epoch + 1) % val_period == 0:
+            print("**** Validation Epoch ****")
+            results = test_model(model, val_dl, criterion, device=device)
+            print(results)
