@@ -1,9 +1,14 @@
-from sklearn.metrics import f1_score, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import mlflow
+import seaborn as sns
+from sklearn.metrics import auc, balanced_accuracy_score, confusion_matrix, f1_score, roc_curve
 import torch
 from torch.utils.data import DataLoader
 
 
-def test_model(model, test_dls, criterion, pos_class=4, device=torch.device("cpu")):
+def test_model(
+    model, test_dls, criterion, pos_class=4, device=torch.device("cpu"), log_artifacts=False
+):
     """Evaluate a model across one val/test DataLoaders.
 
     Works with both single-modal loaders (batches of ``(X, y)``) and
@@ -18,14 +23,19 @@ def test_model(model, test_dls, criterion, pos_class=4, device=torch.device("cpu
     results = []
 
     for test_dl in test_dls:
-        results.append(_test_model(model, test_dl, criterion, pos_class, device=device))
+        results.append(
+            _test_model(
+                model, test_dl, criterion, pos_class, device=device, log_artifacts=log_artifacts
+            )
+        )
 
     return results
 
 
-def _test_model(model, test_dl, criterion, pos_class, device=torch.device("cpu")):
+def _test_model(
+    model, test_dl, criterion, pos_class, device=torch.device("cpu"), log_artifacts=False
+):
     generalization_error = 0.0
-    correct = 0
     predictions = []
     scores = []
     targets = []
@@ -38,7 +48,6 @@ def _test_model(model, test_dl, criterion, pos_class, device=torch.device("cpu")
             logits = model(*inputs)
             loss = criterion(logits, y)
             pred = torch.argmax(logits, dim=1)
-            correct += (pred == y).sum().item()
             generalization_error += loss.item()
             scores.append(torch.softmax(logits, dim=1).cpu())
             predictions.append(pred.cpu())
@@ -49,27 +58,42 @@ def _test_model(model, test_dl, criterion, pos_class, device=torch.device("cpu")
     y_score = torch.cat(scores)
 
     generalization_error /= len(test_dl.dataset)
-    accuracy = correct / len(test_dl.dataset)
+    accuracy = balanced_accuracy_score(y_true, y_pred)
     f1score = f1_score(y_true, y_pred, average="weighted")
     bin_f1_score = f1_score(
         (y_true == pos_class).long(),
         (y_pred == pos_class).long(),
-        average="weighted",
+        average="binary",
     )
+
     fpr, tpr, _ = roc_curve(y_true, y_score[:, pos_class], pos_label=pos_class)
-    auc = roc_auc_score(
-        (y_true == pos_class).long(),
-        (y_pred == pos_class).long(),
-    )
+    auc_score = auc(fpr, tpr)
+    if log_artifacts:
+        fig, ax = plt.subplots()
+        ax.plot(fpr, tpr, label=f"AUC = {auc_score:.4f}")
+        ax.plot([0, 1], [0, 1], linestyle="--", color="gray")
+        ax.set_xlabel("False Positive Rate")
+        ax.set_ylabel("True Positive Rate")
+        ax.set_title("ROC Curve")
+        ax.legend()
+
+        mlflow.log_figure(fig, "roc_curve.png")
+        plt.close(fig)
+
+        cm = confusion_matrix(y_true, y_pred)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("True")
+        ax.set_title("Confusion Matrix")
+        mlflow.log_figure(fig, "confusion_matrix.png")
+        plt.close(fig)
 
     return {
-        "gen_error": generalization_error,
-        "Weighted_gen_error": None,
-        "Accuracy": accuracy,
-        "Weighted F1-score": f1score,
-        "Binary F1-score": bin_f1_score,
-        "Binary AUC": auc,
+        "Generalization_error": generalization_error,
+        # TODO: add "Weighted_gen_error": None,
+        "Balanced_accuracy": accuracy,
+        "Weighted_f1_score": f1score,
+        "Binary_f1_score": bin_f1_score,
+        "auc": auc_score,
     }
-
-
-# todo will add fpr and tpr to plot roc curve

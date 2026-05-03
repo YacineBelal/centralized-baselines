@@ -17,7 +17,7 @@ def train_model(
     criterion,
     epochs,
     val_dl=None,
-    val_period=5,
+    val_period=1,
     tolerated_steps=2,
     device=torch.device("cpu"),
 ):
@@ -53,15 +53,15 @@ def train_model(
             results = test_model(model, val_dl, criterion, device=device)
             metrics = {f"val_{k}": v for k, v in results[0].items()}
             mlflow.log_metrics(metrics, step=epoch)
-            if results[0]["Binary F1-score"] > best_f1_score:
-                best_f1_score = results[0]["Binary F1-score"]
+            if results[0]["Binary_f1_score"] > best_f1_score:
+                best_f1_score = results[0]["Binary_f1_score"]
                 best_model = copy.deepcopy(model.state_dict())
                 tolerated_steps_ctr = tolerated_steps
             else:
                 tolerated_steps_ctr -= 1
 
             print(
-                f"  Binary F1:  {results[0]['Binary F1-score']:.4f}  (best: {best_f1_score:.4f}  patience: {tolerated_steps_ctr}/{tolerated_steps})"
+                f"  Binary_f1_score:  {results[0]['Binary_f1_score']:.4f}  (best: {best_f1_score:.4f}  patience: {tolerated_steps_ctr}/{tolerated_steps})"
             )
             print(f"{'─' * 40}")
 
@@ -72,4 +72,6 @@ def train_model(
     if val_dl is not None:
         model.load_state_dict(best_model)
 
-    mlflow.pytorch.log_model(model, name="multiscale_cnn")
+    mlflow.pytorch.log_model(
+        model, name="multiscale_cnn"
+    )  # TODO switch to pt2 deserialization format which requires input_example

@@ -195,7 +195,11 @@ cython_debug/
 
 # CLAUDE related files
 CLAUDE.md
-
+.claude
 
 #Reports
 reports
+
+#MLflow
+mlruns/
+mlflow.db
