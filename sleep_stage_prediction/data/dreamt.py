@@ -220,6 +220,7 @@ def _preprocess_dreamt_multimodal(signals, labels):
         ]
     )
     classes = np.unique(all_labels)
+    # label_encoder = {"0"}
     label_encoder = {val: idx for idx, val in enumerate(classes)}
 
     bvps, accs, eda_temps, hrs, ys = [], [], [], [], []

@@ -4,7 +4,7 @@ from tqdm import tqdm
 __all__ = ["train_model"]
 
 
-def train_model(model, train_dl, optimizer, criterion, epochs, device="cpu"):
+def train_model(model, train_dl, optimizer, criterion, epochs, device=torch.device("cpu")):
     """Train a model for a fixed number of epochs.
 
     Works with both single-modal loaders (batches of ``(X, y)``) and

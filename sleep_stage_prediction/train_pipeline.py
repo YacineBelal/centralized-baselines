@@ -4,18 +4,23 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from sleep_stage_prediction.data import DreamtDataset, Workflow, load_dreamt
-from sleep_stage_prediction.models import ConvolutionalClassifier, test_model, train_model
+from sleep_stage_prediction.data import MultiModalDreamtDataset, load_dreamt_multimodal
+from sleep_stage_prediction.models import (
+    MultiScaleCNN,
+    test_model,
+    train_model,
+)
 
 
 def main(
-    nb_patients=1,
-    workflow=Workflow.CENTRALIZED,
+    nb_patients=10,
     frequency=64,
-    epochs=1,
+    n_fft=16,
+    epochs=10,
     batch_size=128,
     lr=0.001,
     momentum=0.9,
+    mode="design",
     seed=42,
 ):
     torch.manual_seed(seed)
@@ -24,28 +29,34 @@ def main(
     torch.backends.cudnn.deterministic = True
 
     DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    workflow = workflow if isinstance(workflow, Workflow) else Workflow[workflow]
-    X_train, X_test, y_train, y_test = load_dreamt(
-        nb_patients, workflow=workflow, frequency=frequency, seed=seed
+    dataset = load_dreamt_multimodal(
+        nb_patients,
+        frequency,
+        seed,
+        mode,
     )
 
     train_dl = DataLoader(
-        DreamtDataset(X_train, y_train),
+        MultiModalDreamtDataset(n_fft=n_fft, **dataset["train"]),
         batch_size=batch_size,
         shuffle=True,
         generator=torch.Generator().manual_seed(seed),
     )
-    test_dls = [
-        DataLoader(DreamtDataset(x, y), batch_size=256)
-        for x, y in zip(X_test, y_test)
-    ]
+    test_dl = DataLoader(MultiModalDreamtDataset(n_fft=n_fft, **dataset["test"]), batch_size=1024)
 
-    model = ConvolutionalClassifier(channel_in=7, kernel_size=7).to(DEVICE)
+    model = MultiScaleCNN().to(DEVICE)
     optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
     criterion = nn.CrossEntropyLoss(reduction="sum")
 
     train_model(model, train_dl, optimizer, criterion, epochs, DEVICE)
-    test_model(model, test_dls, criterion, device=DEVICE)
+
+    if mode == "design":
+        val_dl = DataLoader(
+            MultiModalDreamtDataset(n_fft=n_fft, **dataset["val"]), batch_size=1024
+        )
+
+    test_model(model, val_dl, criterion, device=DEVICE)
+    test_model(model, test_dl, criterion, device=DEVICE)
 
 
 if __name__ == "__main__":
