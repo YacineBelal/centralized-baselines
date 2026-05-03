@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose, Lambda
 
@@ -41,18 +40,32 @@ class MultiModalDreamtDataset(Dataset):
     Returns (x_bvp, x_acc, x_eda_temp, x_hr, y) tuples.
     """
 
-    def __init__(self, X_bvp, X_acc, X_eda_temp, X_hr, y):
+    def __init__(self, X_bvp, X_acc, X_eda_temp, X_hr, y, n_fft):
         super().__init__()
         self.X_bvp = X_bvp
         self.X_acc = X_acc
         self.X_eda_temp = X_eda_temp
         self.X_hr = X_hr
         self.y = y
+        self.n_fft = n_fft
+        self.hann_window = torch.hann_window(n_fft)
 
     def __getitem__(self, index):
+        acc_stft = (
+            torch.stft(
+                torch.FloatTensor(self.X_acc[index]),
+                n_fft=self.n_fft,
+                hop_length=self.n_fft // 2,
+                center=False,
+                normalized=True,
+                return_complex=True,
+            ).abs()
+            ** 2
+        )
+        log_acc_stft = 10 * torch.log(acc_stft + 1e-8)
         return (
             torch.FloatTensor(self.X_bvp[index]),
-            torch.FloatTensor(self.X_acc[index]),
+            log_acc_stft,
             torch.FloatTensor(self.X_eda_temp[index]),
             torch.FloatTensor(self.X_hr[index]),
             torch.tensor(int(self.y[index]), dtype=torch.long),
