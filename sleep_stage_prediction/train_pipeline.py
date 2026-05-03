@@ -1,4 +1,5 @@
 import fire
+import mlflow
 import numpy as np
 import torch
 import torch.nn as nn
@@ -10,6 +11,8 @@ from sleep_stage_prediction.models import (
     test_model,
     train_model,
 )
+
+mlflow.set_experiment("MULTICNN hyperparameterization")
 
 
 def main(
@@ -46,17 +49,41 @@ def main(
     )
     test_dl = DataLoader(MultiModalDreamtDataset(n_fft=n_fft, *dataset["test"]), batch_size=1024)
 
-    model = MultiScaleCNN().to(DEVICE)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.CrossEntropyLoss(reduction="sum")
+    with mlflow.start_run():
+        mlflow.log_params(
+            {
+                "frequency": frequency,
+                "n_fft": n_fft,
+                "batch_size": batch_size,
+                "lr": 0.001,
+                "activation": "ReLU",
+                "criterion": "CrossEntropyLoss",
+                "optimizer": "Adam",
+                "test_size": test_size,
+                "val_size": val_size,
+                "mode": "design",
+            }
+        )
 
-    if mode == "design":
-        val_dl = DataLoader(MultiModalDreamtDataset(n_fft=n_fft, *dataset["val"]), batch_size=1024)
-        train_model(model, train_dl, optimizer, criterion, epochs, val_dl=val_dl, device=DEVICE)
-    else:
-        train_model(model, train_dl, optimizer, criterion, epochs, device=DEVICE)
+        model = MultiScaleCNN().to(DEVICE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss(reduction="sum")
 
-    test_model(model, test_dl, criterion, device=DEVICE)
+        if mode == "design":
+            val_dl = DataLoader(
+                MultiModalDreamtDataset(n_fft=n_fft, *dataset["val"]), batch_size=1024
+            )
+            train_model(
+                model, train_dl, optimizer, criterion, epochs, val_dl=val_dl, device=DEVICE
+            )
+        else:
+            train_model(model, train_dl, optimizer, criterion, epochs, device=DEVICE)
+
+        results = test_model(model, test_dl, criterion, device=DEVICE)
+        test_metrics = {f"test_{k}": v for k, v in results[0].items()}
+        mlflow.log_metrics(test_metrics)
+        mlflow.log_text(str(model), "architecture.txt")
+        mlflow.set_tags({"model_type": "MultiScaleCNN", "dataset": "DREAMT"})
 
 
 if __name__ == "__main__":

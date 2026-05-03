@@ -191,7 +191,6 @@ def load_dreamt_multimodal(
         save_data_array(path / "test_eda_temp", X_eda_temp_test)
         save_data_array(path / "test_hr", X_hr_test)
         save_data_array(path / "test_target", y_test)
-        print(splits.val)
         if splits.val is not None:
             X_bvp_val = np.concatenate([bvps[i] for i in splits.val])
             X_acc_val = np.concatenate([accs[i] for i in splits.val])
