@@ -1,10 +1,9 @@
-import numpy as np
 from sklearn.metrics import f1_score, roc_auc_score, roc_curve
 import torch
 from torch.utils.data import DataLoader
 
 
-def test_model(model, test_dls, criterion, device=torch.device("cpu")):
+def test_model(model, test_dls, criterion, pos_class=4, device=torch.device("cpu")):
     """Evaluate a model across one val/test DataLoaders.
 
     Works with both single-modal loaders (batches of ``(X, y)``) and
@@ -18,12 +17,12 @@ def test_model(model, test_dls, criterion, device=torch.device("cpu")):
         test_dls = [test_dls]
 
     for test_dl in test_dls:
-        results = _test_model(model, test_dl, criterion, device)
+        results = _test_model(model, test_dl, criterion, pos_class, device=device)
         print(results)
     return None
 
 
-def _test_model(model, test_dl, criterion, pos_class=4, device=torch.device("cpu")):
+def _test_model(model, test_dl, criterion, pos_class, device=torch.device("cpu")):
     generalization_error = 0.0
     correct = 0
     predictions = []
@@ -51,43 +50,25 @@ def _test_model(model, test_dl, criterion, pos_class=4, device=torch.device("cpu
     generalization_error /= len(test_dl.dataset)
     accuracy = correct / len(test_dl.dataset)
     f1score = f1_score(y_true, y_pred, average="weighted")
-    pos_f1_score = f1_score(y_true, y_pred, pos_label=pos_class, average="binary")
+    pos_f1_score = f1_score(
+        (y_true == pos_class).long(),
+        (y_pred == pos_class).long(),
+        average="binary",
+    )
     fpr, tpr, _ = roc_curve(y_true, y_score[:, pos_class], pos_label=pos_class)
-    auc = roc_auc_score(y_true, y_score[:, pos_class])
+    auc = roc_auc_score(
+        (y_true == pos_class).long(),
+        (y_pred == pos_class).long(),
+    )
 
     return {
         "gen_error": generalization_error,
-        "weighted_gen_error": None,
-        "accuracy": accuracy,
-        "weighted f1-score": f1score,
-        "pos_class f1-score": pos_f1_score,
-        "auc": auc,
+        "Weighted_gen_error": None,
+        "Accuracy": accuracy,
+        "Weighted F1-score": f1score,
+        "Binary F1-score": pos_f1_score,
+        "Binary AUC": auc,
     }
 
 
 # todo will add fpr and tpr to plot roc curve
-
-
-def _merge_labels(cls_to_merge: list, Y: torch.Tensor):
-    """Merge a subset of classes into a single binary label.
-
-    Classes in `cls_to_merge` are mapped to 0, all others to 1.
-    Useful for binary evaluation metrics like ROC AUC.
-
-    Parameters
-    ----------
-    cls_to_merge : list
-        Class indices to merge into the negative class (0).
-    Y : torch.Tensor
-        Integer label tensor of shape (N,).
-
-    Returns
-    -------
-    np.ndarray
-        Binary label array of shape (N,) with dtype int32.
-    """
-
-    Y_out = np.ones_like(Y, dtype=np.int32)
-    Y_out[np.isin(Y, cls_to_merge)] = 0
-
-    return Y_out

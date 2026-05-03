@@ -25,7 +25,7 @@ def load_dreamt(nb_patients, frequency=64, test_size=0.2, val_size=0.1, seed=42,
     X_test = []
     y_train = []
     y_test = []
-    if cache_exists(path, nb_patients):
+    if cache_exists(path, nb_patients, mode):
         for idx in range(nb_patients):
             client_path = path / f"client_{idx}"
             X_train.append(np.load(client_path / "train_data.npy"))
@@ -143,7 +143,7 @@ def load_dreamt_multimodal(
     test_idx = splits.test
     nb_train = len(train_idx)
 
-    if multimodal_cache_exists(path, nb_train):
+    if multimodal_cache_exists(path, nb_train, mode):
         X_bvp_train = [np.load(path / f"client_{i}" / "train_bvp.npy") for i in range(nb_train)]
         X_acc_train = [np.load(path / f"client_{i}" / "train_acc.npy") for i in range(nb_train)]
         X_eda_temp_train = [
@@ -156,6 +156,13 @@ def load_dreamt_multimodal(
         X_eda_temp_test = np.load(path / "test_eda_temp.npy")
         X_hr_test = np.load(path / "test_hr.npy")
         y_test = np.load(path / "test_target.npy")
+        if mode == "design":
+            X_bvp_val = np.load(path / "val_bvp.npy")
+            X_acc_val = np.load(path / "val_acc.npy")
+            X_eda_temp_val = np.load(path / "val_eda_temp.npy")
+            X_hr_val = np.load(path / "val_hr.npy")
+            y_val = np.load(path / "val_target.npy")
+
     else:
         from .utils import save_data_array
 
@@ -184,7 +191,7 @@ def load_dreamt_multimodal(
         save_data_array(path / "test_eda_temp", X_eda_temp_test)
         save_data_array(path / "test_hr", X_hr_test)
         save_data_array(path / "test_target", y_test)
-
+        print(splits.val)
         if splits.val is not None:
             X_bvp_val = np.concatenate([bvps[i] for i in splits.val])
             X_acc_val = np.concatenate([accs[i] for i in splits.val])
@@ -196,17 +203,6 @@ def load_dreamt_multimodal(
             save_data_array(path / "val_eda_temp", X_eda_temp_val)
             save_data_array(path / "val_hr", X_hr_val)
             save_data_array(path / "val_target", y_val)
-            return {
-                "train": (
-                    np.concatenate(X_bvp_train),
-                    np.concatenate(X_acc_train),
-                    np.concatenate(X_eda_temp_train),
-                    np.concatenate(X_hr_train),
-                    np.concatenate(y_train),
-                ),
-                "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
-                "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val),
-            }
 
     return {
         "train": (
@@ -217,8 +213,10 @@ def load_dreamt_multimodal(
             np.concatenate(y_train),
         ),
         "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
+        "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val)
+        if mode == "design"
+        else None,
     }
-
 
 def _preprocess_dreamt_multimodal(signals, labels):
     """Chunk raw signals into 30-second windows split by modality.

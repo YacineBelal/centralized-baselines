@@ -18,7 +18,7 @@ def main(
     test_size=0.2,
     val_size=0.2,
     n_fft=32,
-    epochs=10,
+    epochs=1,
     batch_size=128,
     lr=0.001,
     mode="design",
@@ -38,7 +38,6 @@ def main(
         seed,
         mode,
     )
-
     train_dl = DataLoader(
         MultiModalDreamtDataset(n_fft=n_fft, *dataset["train"]),
         batch_size=batch_size,
