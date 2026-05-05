@@ -97,9 +97,9 @@ def _test_model(
         plt.close(fig)
 
     return {
-        "generalization_error": generalization_error,
-        "balanced_accuracy (5 class)": accuracy,
-        "macro_f1_score (5 class)": f1score,
-        "binary_f1_score": binary_f1_score,
-        "pr_curve_auc": auc_score,
+        "loss/generalization_error": generalization_error,
+        "multiclass/balanced_accuracy": accuracy,
+        "multiclass/macro_f1": f1score,
+        "binary/f1": binary_f1_score,
+        "binary/pr_auc": auc_score,
     }
