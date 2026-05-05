@@ -59,11 +59,9 @@ def _test_model(
 
     generalization_error /= len(test_dl.dataset)
     accuracy = balanced_accuracy_score(y_true, y_pred)
-    f1score = f1_score(y_true, y_pred, average="weighted")
-    bin_f1_score = f1_score(
-        (y_true == pos_class).long(),
-        (y_pred == pos_class).long(),
-        average="binary",
+    f1score = f1_score(y_true, y_pred, average="macro")
+    binary_f1_score = f1_score(
+        (y_true == pos_class).long(), (y_pred == pos_class).long(), average="binary"
     )
 
     fpr, tpr, _ = roc_curve(y_true, y_score[:, pos_class], pos_label=pos_class)
@@ -90,10 +88,10 @@ def _test_model(
         plt.close(fig)
 
     return {
-        "Generalization_error": generalization_error,
+        "generalization_error": generalization_error,
         # TODO: add "Weighted_gen_error": None,
-        "Balanced_accuracy": accuracy,
-        "Weighted_f1_score": f1score,
-        "Binary_f1_score": bin_f1_score,
+        "5_class_balanced_accuracy": accuracy,
+        "macro_f1_score": f1score,
+        "binary_f1_score": binary_f1_score,
         "auc": auc_score,
     }
