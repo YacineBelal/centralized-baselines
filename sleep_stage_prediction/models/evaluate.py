@@ -1,7 +1,13 @@
 import matplotlib.pyplot as plt
 import mlflow
 import seaborn as sns
-from sklearn.metrics import auc, balanced_accuracy_score, confusion_matrix, f1_score, roc_curve
+from sklearn.metrics import (
+    auc,
+    balanced_accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_recall_curve,
+)
 import torch
 from torch.utils.data import DataLoader
 
@@ -64,18 +70,21 @@ def _test_model(
         (y_true == pos_class).long(), (y_pred == pos_class).long(), average="binary"
     )
 
-    fpr, tpr, _ = roc_curve(y_true, y_score[:, pos_class], pos_label=pos_class)
-    auc_score = auc(fpr, tpr)
+    precision, recall, _ = precision_recall_curve(
+        y_true, y_score[:, pos_class], pos_label=pos_class
+    )
+    auc_score = auc(recall, precision)
     if log_artifacts:
         fig, ax = plt.subplots()
-        ax.plot(fpr, tpr, label=f"AUC = {auc_score:.4f}")
-        ax.plot([0, 1], [0, 1], linestyle="--", color="gray")
-        ax.set_xlabel("False Positive Rate")
-        ax.set_ylabel("True Positive Rate")
-        ax.set_title("ROC Curve")
+        ax.plot(precision, recall, label=f"AUC = {auc_score:.4f}")
+        baseline = (y_true == pos_class).float().mean().item()
+        ax.plot(baseline, linestyle="--", color="gray")
+        ax.set_xlabel("Precision")
+        ax.set_ylabel("Recall")
+        ax.set_title("PRC Curve")
         ax.legend()
 
-        mlflow.log_figure(fig, "roc_curve.png")
+        mlflow.log_figure(fig, "prc_curve.png")
         plt.close(fig)
 
         cm = confusion_matrix(y_true, y_pred)
@@ -89,9 +98,8 @@ def _test_model(
 
     return {
         "generalization_error": generalization_error,
-        # TODO: add "Weighted_gen_error": None,
-        "5_class_balanced_accuracy": accuracy,
-        "macro_f1_score": f1score,
+        "balanced_accuracy (5 class)": accuracy,
+        "macro_f1_score (5 class)": f1score,
         "binary_f1_score": binary_f1_score,
-        "auc": auc_score,
+        "pr_curve_auc": auc_score,
     }
