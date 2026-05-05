@@ -21,7 +21,7 @@ def main(
     test_size=0.2,
     val_size=0.1,
     n_fft=32,
-    epochs=2,
+    epochs=50,
     batch_size=32,
     lr=0.001,
     mode="design",
@@ -80,7 +80,7 @@ def main(
             train_model(model, train_dl, optimizer, criterion, epochs, device=DEVICE)
 
         results = test_model(model, test_dl, criterion, device=DEVICE, log_artifacts=True)
-        test_metrics = {f"test_{k}": v for k, v in results[0].items()}
+        test_metrics = {f"test/{k}": v for k, v in results[0].items()}
         mlflow.log_metrics(test_metrics)
         mlflow.log_text(str(model), "architecture.txt")
         mlflow.set_tags({"model_type": "MultiScaleCNN", "dataset": "DREAMT"})
