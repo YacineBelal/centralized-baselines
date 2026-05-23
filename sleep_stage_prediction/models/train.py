@@ -18,7 +18,7 @@ def train_model(
     epochs,
     val_dl=None,
     val_period=5,
-    tolerated_steps=2,
+    tolerated_steps=3,
     device=torch.device("cpu"),
 ):
     """Train a model for a fixed number of epochs.
@@ -46,7 +46,7 @@ def train_model(
 
         empirical_risk /= len(train_dl.dataset)
         print(f"Epoch [{epoch + 1}/{epochs}] | Train loss: {empirical_risk:.4f}")
-        mlflow.log_metrics({"train/loss/generalization_error": empirical_risk}, step=epoch)
+        mlflow.log_metrics({"train/loss": empirical_risk}, step=epoch)
         if val_dl is not None and (epoch + 1) % val_period == 0:
             print(f"{'─' * 40}")
             print(f"  Validation @ epoch {epoch + 1}")
@@ -61,7 +61,7 @@ def train_model(
                 tolerated_steps_ctr -= 1
 
             print(
-                f"  binary/f1  {results[0]['binary/f1']:.4f}  (best: {best_f1_score:.4f}  patience: {tolerated_steps_ctr}/{tolerated_steps})"
+                f"  loss: {metrics['val/loss']:.4f}  | binary/balanced_accuracy: {metrics['val/binary/balanced_accuracy']} | multiclass/balanced_accuracy: {metrics['val/multiclass/balanced_accuracy']} | binary/f1:  {metrics['val/binary/f1']:.4f}  (best f1: {best_f1_score:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
             )
             print(f"{'─' * 40}")
 

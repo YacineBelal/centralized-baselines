@@ -203,16 +203,50 @@ def load_dreamt_multimodal(
             save_data_array(path / "val_hr", X_hr_val)
             save_data_array(path / "val_target", y_val)
 
+    X_bvp_train = np.concatenate(X_bvp_train)
+    mean_bvp = X_bvp_train.mean(axis=0)
+    std_bvp = X_bvp_train.std(axis=0)
+    X_bvp_train = (X_bvp_train - mean_bvp) / (std_bvp + 1e-8)
+
+    X_acc_train = np.concatenate(X_acc_train)
+    mean_acc = X_acc_train.mean(axis=0)
+    std_acc = X_acc_train.std(axis=0)
+    X_acc_train = (X_acc_train - mean_acc) / (std_acc + 1e-8)
+
+    X_eda_temp_train = np.concatenate(X_eda_temp_train)
+    mean_eda_temp = X_eda_temp_train.mean(axis=0)
+    std_eda_temp = X_eda_temp_train.std(axis=0)
+    X_eda_temp_train = (X_eda_temp_train - mean_eda_temp) / (std_eda_temp + 1e-8)
+
+    X_hr_train = np.concatenate(X_hr_train)
+    mean_hr = X_hr_train.mean(axis=0)
+    std_hr = X_hr_train.std(axis=0)
+    X_hr_train = (X_hr_train - mean_hr) / (std_hr + 1e-8)
+
+    y_train = np.concatenate(y_train)
+
     return {
         "train": (
-            np.concatenate(X_bvp_train),
-            np.concatenate(X_acc_train),
-            np.concatenate(X_eda_temp_train),
-            np.concatenate(X_hr_train),
-            np.concatenate(y_train),
+            X_bvp_train,
+            X_acc_train,
+            X_eda_temp_train,
+            X_hr_train,
+            y_train,
         ),
-        "test": (X_bvp_test, X_acc_test, X_eda_temp_test, X_hr_test, y_test),
-        "val": (X_bvp_val, X_acc_val, X_eda_temp_val, X_hr_val, y_val)
+        "test": (
+            (X_bvp_test - mean_bvp) / (std_bvp + 1e-8),
+            (X_acc_test - mean_acc) / (std_acc + 1e-8),
+            (X_eda_temp_test - mean_eda_temp) / (std_eda_temp + 1e-8),
+            (X_hr_test - mean_hr) / (std_hr + 1e-8),
+            y_test,
+        ),
+        "val": (
+            (X_bvp_val - mean_bvp) / (std_bvp + 1e-8),
+            (X_acc_val - mean_acc) / (std_acc + 1e-8),
+            (X_eda_temp_val - mean_eda_temp) / (std_eda_temp + 1e-8),
+            (X_hr_val - mean_hr) / (std_hr + 1e-8),
+            y_val,
+        )
         if mode == "design"
         else None,
     }
@@ -224,7 +258,7 @@ def _preprocess_dreamt_multimodal(signals, labels):
     Arrays are already in (C, T) format ready for Conv1d.
     """
     fs = 64
-    window_samples = fs * 30  # 1920
+    window_samples = fs * 300  # 19200
 
     all_labels = np.concatenate(
         [

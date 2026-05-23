@@ -118,52 +118,55 @@ class MultiScaleCNN(nn.Module):
         super().__init__()
 
         self.bvp_path = nn.Sequential(
-            nn.BatchNorm1d(1),
-            nn.Conv1d(1, 32, kernel_size=3, stride=2, padding=1),
+            nn.Conv1d(1, 32, kernel_size=13, stride=2, padding=0),
             nn.BatchNorm1d(32),
             nn.ReLU(),
             nn.MaxPool1d(2),
             ResBlock1d(32),
-            nn.Conv1d(32, 64, kernel_size=5, stride=2, padding=2),
-            nn.BatchNorm1d(64),
+            nn.Conv1d(32, 32, kernel_size=15, stride=2, padding=0),
+            nn.BatchNorm1d(32),
             nn.ReLU(),
             nn.MaxPool1d(2),
-            ResBlock1d(64),
-            nn.Conv1d(64, 128, kernel_size=7, stride=2, padding=3),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.MaxPool1d(2),
-            ResBlock1d(128),
-        )  # → (B, 128, 30)
+            ResBlock1d(32),
+            # nn.Conv1d(64, 128, kernel_size=7, stride=2, padding=3),
+            # nn.BatchNorm1d(128),
+            # nn.ReLU(),
+            # nn.MaxPool1d(2),
+            # ResBlock1d(128),
+        )  # (B, 128, 30)
 
+        # input (B, 3, 17, 59)
         self.acc_path = nn.Sequential(
-            nn.BatchNorm2d(3),
-            nn.Conv2d(3, 32, kernel_size=(1, 3), padding=(0, 1)),
+            nn.Conv2d(3, 32, kernel_size=(1, 13), stride=(1, 2), padding=(0, 0)),
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(1, 2)),
             ResBlock2d(32),
-            nn.Conv2d(32, 64, kernel_size=(1, 3), stride=(1, 2), padding=(0, 2)),
-            nn.BatchNorm2d(64),
+            nn.Conv2d(32, 32, kernel_size=(1, 15), stride=(1, 2), padding=(0, 0)),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            ResBlock2d(64),
-        )  # → (B, 64, 30)
+            nn.MaxPool2d(kernel_size=(1, 2)),
+            ResBlock2d(32),
+        )  # (B, 32, 17, 33)
 
+        # input (B, 2, 120)
         self.eda_temp_path = nn.Sequential(
-            nn.BatchNorm1d(2),
-            nn.Conv1d(2, 16, kernel_size=3, stride=2, padding=1),
+            nn.Conv1d(2, 16, kernel_size=3, stride=2, padding=1),  # →60
             nn.BatchNorm1d(16),
             nn.ReLU(),
-            nn.MaxPool1d(2),
-        )  # → (B, 16, 30)
-
-        self.hr_bn = nn.BatchNorm1d(1)
+            nn.MaxPool1d(2),  # →30
+        )  # (B, 16, 30) — too shallow for residuals
 
         self.fc = nn.Sequential(
-            nn.Linear(128 * 30 + 64 * 17 * 16 + 16 * 30 + 30, 512),
+            nn.Linear(32 * 17 * 33 + 300, 512),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, 128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(128, 5),
@@ -181,11 +184,11 @@ class MultiScaleCNN(nn.Module):
                 nn.init.zeros_(layer.bias)
 
     def forward(self, x_bvp, x_acc, x_eda_temp, x_hr):
-        x_hr = self.hr_bn(x_hr.unsqueeze(1)).squeeze(1)
+        x_hr = x_hr
         out_bvp = self.bvp_path(x_bvp).flatten(1)
         out_acc = self.acc_path(x_acc).flatten(1)
-        out_eda_temp = self.eda_temp_path(x_eda_temp).flatten(1)
-        merged = torch.cat([out_bvp, out_acc, out_eda_temp, x_hr.flatten(1)], dim=1)
+        # out_eda_temp = self.eda_temp_path(x_eda_temp).flatten(1)
+        merged = torch.cat([out_acc, x_hr], dim=1)
         return self.fc(merged)
 
 

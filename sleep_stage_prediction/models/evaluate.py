@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import mlflow
 import seaborn as sns
 from sklearn.metrics import (
-    auc,
+    average_precision_score,
     balanced_accuracy_score,
     confusion_matrix,
     f1_score,
@@ -69,18 +69,20 @@ def _test_model(
     binary_f1_score = f1_score(
         (y_true == pos_class).long(), (y_pred == pos_class).long(), average="binary"
     )
-
+    binary_accuracy = balanced_accuracy_score(
+        (y_true == pos_class).long(), (y_pred == pos_class).long()
+    )
     precision, recall, _ = precision_recall_curve(
         y_true, y_score[:, pos_class], pos_label=pos_class
     )
-    auc_score = auc(recall, precision)
+    ap_score = average_precision_score((y_true == pos_class).long(), y_score[:, pos_class])
     if log_artifacts:
         fig, ax = plt.subplots()
-        ax.plot(precision, recall, label=f"AUC = {auc_score:.4f}")
+        ax.plot(recall, precision, label=f"AP = {ap_score:.4f}")
         baseline = (y_true == pos_class).float().mean().item()
-        ax.plot(baseline, linestyle="--", color="gray")
-        ax.set_xlabel("Precision")
-        ax.set_ylabel("Recall")
+        ax.axhline(y=baseline, linestyle="--", color="gray", label=f"Baseline = {baseline:.4f}")
+        ax.set_xlabel("Recall")
+        ax.set_ylabel("Precision")
         ax.set_title("PRC Curve")
         ax.legend()
 
@@ -97,9 +99,10 @@ def _test_model(
         plt.close(fig)
 
     return {
-        "loss/generalization_error": generalization_error,
+        "loss": generalization_error,
         "multiclass/balanced_accuracy": accuracy,
         "multiclass/macro_f1": f1score,
         "binary/f1": binary_f1_score,
-        "binary/pr_auc": auc_score,
+        "binary/balanced_accuracy": binary_accuracy,
+        "binary/ap_score": ap_score,
     }

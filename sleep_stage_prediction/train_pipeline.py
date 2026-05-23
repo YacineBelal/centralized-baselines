@@ -1,6 +1,7 @@
 import fire
 import mlflow
 import numpy as np
+from sklearn.utils.class_weight import compute_class_weight
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -12,8 +13,6 @@ from sleep_stage_prediction.models import (
     train_model,
 )
 
-mlflow.set_experiment("MULTICNN hyperparameterization")
-
 
 def main(
     nb_patients=100,
@@ -23,7 +22,7 @@ def main(
     n_fft=32,
     epochs=50,
     batch_size=32,
-    lr=0.001,
+    lr=0.00005,
     mode="design",
     seed=42,
 ):
@@ -47,31 +46,39 @@ def main(
         shuffle=True,
         generator=torch.Generator().manual_seed(seed),
     )
-    test_dl = DataLoader(MultiModalDreamtDataset(n_fft=n_fft, *dataset["test"]), batch_size=1024)
-
+    test_dl = DataLoader(
+        MultiModalDreamtDataset(n_fft=n_fft, *dataset["test"]),
+        batch_size=128,
+        shuffle=False,
+    )
+    mlflow.set_experiment("MULTICNN hyperparameterization")
     with mlflow.start_run():
+        model = MultiScaleCNN().to(DEVICE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        classes = np.unique(dataset["train"][-1])
+        weights = compute_class_weight("balanced", classes=classes, y=dataset["train"][-1])
+        weights = torch.Tensor(weights).to(DEVICE)
+        criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
+
         mlflow.log_params(
             {
                 "frequency": frequency,
                 "n_fft": n_fft,
                 "batch_size": batch_size,
-                "lr": 0.001,
-                "activation": "ReLU",
-                "criterion": "CrossEntropyLoss",
-                "optimizer": "Adam",
+                "lr": lr,
+                "criterion": criterion.__class__.__name__,
+                "optimizer": optimizer.__class__.__name__,
                 "test_size": test_size,
                 "val_size": val_size,
-                "mode": "design",
+                "mode": mode,
             }
         )
 
-        model = MultiScaleCNN().to(DEVICE)
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        criterion = nn.CrossEntropyLoss(reduction="sum")
-
         if mode == "design":
             val_dl = DataLoader(
-                MultiModalDreamtDataset(n_fft=n_fft, *dataset["val"]), batch_size=1024
+                MultiModalDreamtDataset(n_fft=n_fft, *dataset["val"]),
+                batch_size=128,
+                shuffle=False,
             )
             train_model(
                 model, train_dl, optimizer, criterion, epochs, val_dl=val_dl, device=DEVICE
