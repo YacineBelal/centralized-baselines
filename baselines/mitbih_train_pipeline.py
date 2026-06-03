@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from sleep_stage_prediction.data import MitbihDataset, load_mit_bih
-from sleep_stage_prediction.models import (
+from baselines.data import MitbihDataset, load_mit_bih
+from baselines.models import (
     CNN,
     test_model,
     train_model,

@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from sleep_stage_prediction.data import MultiModalDreamtDataset, load_dreamt_multimodal
-from sleep_stage_prediction.models import (
+from baselines.data import MultiModalDreamtDataset, load_dreamt_multimodal
+from baselines.models import (
     MultiScaleCNN,
     test_model,
     train_model,

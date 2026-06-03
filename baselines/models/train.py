@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from sleep_stage_prediction.models import test_model
+from baselines.models import test_model
 
 __all__ = ["train_model"]
 
