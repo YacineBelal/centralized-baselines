@@ -19,6 +19,7 @@ def train_model(
     val_dl=None,
     val_period=5,
     tolerated_steps=3,
+    normal_class=0,
     device=torch.device("cpu"),
 ):
     """Train a model for a fixed number of epochs.
@@ -50,7 +51,7 @@ def train_model(
         if val_dl is not None and (epoch + 1) % val_period == 0:
             print(f"{'─' * 40}")
             print(f"  Validation @ epoch {epoch + 1}")
-            results = test_model(model, val_dl, criterion, device=device)
+            results = test_model(model, val_dl, criterion, normal_class, device=device)
             metrics = {f"val/{k}": v for k, v in results[0].items()}
             mlflow.log_metrics(metrics, step=epoch)
             if results[0]["binary/f1"] > best_f1_score:
