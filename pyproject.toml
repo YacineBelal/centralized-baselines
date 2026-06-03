@@ -32,6 +32,7 @@ dependencies = [
     "torchvision>=0.25.0",
     "tqdm>=4.67.3",
     "setuptools<81",
+    "wfdb>=4.3.1",
 ]
 requires-python = "~=3.13.0"
 
