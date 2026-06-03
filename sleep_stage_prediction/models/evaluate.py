@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 
 def test_model(
-    model, test_dls, criterion, pos_class=4, device=torch.device("cpu"), log_artifacts=False
+    model, test_dls, criterion, normal_class=0, device=torch.device("cpu"), log_artifacts=False
 ):
     """Evaluate a model across one val/test DataLoaders.
 
@@ -31,7 +31,7 @@ def test_model(
     for test_dl in test_dls:
         results.append(
             _test_model(
-                model, test_dl, criterion, pos_class, device=device, log_artifacts=log_artifacts
+                model, test_dl, criterion, normal_class, device=device, log_artifacts=log_artifacts
             )
         )
 
@@ -39,7 +39,7 @@ def test_model(
 
 
 def _test_model(
-    model, test_dl, criterion, pos_class, device=torch.device("cpu"), log_artifacts=False
+    model, test_dl, criterion, normal_class, device=torch.device("cpu"), log_artifacts=False
 ):
     generalization_error = 0.0
     predictions = []
@@ -66,20 +66,19 @@ def _test_model(
     generalization_error /= len(test_dl.dataset)
     accuracy = balanced_accuracy_score(y_true, y_pred)
     f1score = f1_score(y_true, y_pred, average="macro")
-    binary_f1_score = f1_score(
-        (y_true == pos_class).long(), (y_pred == pos_class).long(), average="binary"
-    )
-    binary_accuracy = balanced_accuracy_score(
-        (y_true == pos_class).long(), (y_pred == pos_class).long()
-    )
-    precision, recall, _ = precision_recall_curve(
-        y_true, y_score[:, pos_class], pos_label=pos_class
-    )
-    ap_score = average_precision_score((y_true == pos_class).long(), y_score[:, pos_class])
+
+    binary_y_true = (y_true != normal_class).long()
+    binary_y_pred = (y_pred != normal_class).long()
+    abnormal_score = 1 - y_score[:, normal_class]
+
+    binary_f1_score = f1_score(binary_y_true, binary_y_pred, average="binary")
+    binary_accuracy = balanced_accuracy_score(binary_y_true, binary_y_pred)
+    precision, recall, _ = precision_recall_curve(binary_y_pred, abnormal_score, pos_label=1)
+    ap_score = average_precision_score(binary_y_true, abnormal_score)
     if log_artifacts:
         fig, ax = plt.subplots()
         ax.plot(recall, precision, label=f"AP = {ap_score:.4f}")
-        baseline = (y_true == pos_class).float().mean().item()
+        baseline = binary_y_true.float().mean().item()
         ax.axhline(y=baseline, linestyle="--", color="gray", label=f"Baseline = {baseline:.4f}")
         ax.set_xlabel("Recall")
         ax.set_ylabel("Precision")
