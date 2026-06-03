@@ -9,6 +9,7 @@ __all__ = [
     "federate_data",
     "centralize_data",
     "patient_leave_out_split",
+    "aami_split",
     "multimodal_cache_exists",
 ]
 
@@ -128,6 +129,86 @@ def cache_exists(cache_dir, nb_patients, mode="design"):
     )
 
     return train_ok and test_ok and val_ok
+
+
+def aami_split(mode="design", val_size=0.2, rng=None):
+    """
+    Split patient records following the AAMI EC57 standard (DS1/DS2).
+    DS1 is train, DS2 is test. In design mode a validation set is carved
+    out of DS1.
+
+    Returns
+    -------
+    design : DataSplit(train, val, test)
+    final  : DataSplit(train, test)
+    """
+
+    DS1 = {
+        "101",
+        "106",
+        "108",
+        "109",
+        "112",
+        "114",
+        "115",
+        "116",
+        "118",
+        "119",
+        "122",
+        "124",
+        "201",
+        "203",
+        "205",
+        "207",
+        "208",
+        "209",
+        "215",
+        "220",
+        "223",
+        "230",
+    }
+
+    DS2 = {
+        "100",
+        "103",
+        "105",
+        "111",
+        "113",
+        "117",
+        "121",
+        "123",
+        "200",
+        "202",
+        "210",
+        "212",
+        "213",
+        "214",
+        "219",
+        "221",
+        "222",
+        "228",
+        "231",
+        "232",
+        "233",
+        "234",
+    }
+
+    train_records = np.array(sorted(DS1))
+    test_records = np.array(sorted(DS2))
+
+    if rng is not None:
+        train_records = rng.permutation(train_records).tolist()
+
+    if mode == "final":
+        return DataSplit(train=train_records, test=test_records)
+
+    n_val = max(1, int(len(train_records) * val_size))
+
+    return DataSplit(
+        train=train_records[n_val:],
+        val=train_records[:n_val],
+        test=test_records,
+    )
 
 
 def patient_leave_out_split(nb_patient, mode="design", test_size=0.2, val_size=0.1, rng=None):
