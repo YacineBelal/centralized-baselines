@@ -8,14 +8,28 @@ from .utils import aami_split
 
 PROJECT_ROOT = "data/raw/mit-bih-arrhythmia-database-1.0.0/"
 PROJECT_ROOT = Path(PROJECT_ROOT)
-
+AAMI_MAP = {
+    "N": "N",
+    "L": "N",
+    "R": "N",
+    "e": "N",
+    "j": "N",
+    "A": "S",
+    "a": "S",
+    "S": "S",
+    "J": "S",
+    "V": "V",
+    "E": "V",
+    # "F":"F", #Removed F and Q as there are not relevant to arrhythmia detection
+    # "/":'Q', "f": "Q", "Q":"Q",
+}
 FS = 360  # MIT-BIH sampling frequency
 
 
 def load_mit_bih(val_size=0.1, mode="design"):
     assert mode in ("design", "final"), f"mode must be 'design' or 'final', got {repr(mode)}"
 
-    X_all, y_all, RR_all = _load_mit_bih()
+    X_all, y_all, SYM_all, RR_all = _load_mit_bih()
     
     classes_n = np.unique(np.concatenate(list(y_all.values()), axis=0))
     label_encoder = {val: idx for idx, val in enumerate(classes_n)}
@@ -38,15 +52,22 @@ def load_mit_bih(val_size=0.1, mode="design"):
     y_val = []
     y_test = []
 
+    sym_train = []
     for client_id, patient_id in enumerate(train_idx):
         X_train.append(X_all[patient_id])
         y_train.append(y_all_encoded[patient_id])
         RR_train.append(RR_all[patient_id])
+        sym_train.append(SYM_all[patient_id])
 
     X_train = np.concatenate(X_train)
     y_train = np.concatenate(y_train)
     RR_train = np.concatenate(RR_train)
+    sym_train = np.concatenate(sym_train)
 
+    beat_symbols = list(AAMI_MAP.keys())
+    matched_filters = np.stack(
+        [X_train[sym_train == s].mean(axis=0) for s in beat_symbols if (sym_train == s).any()]
+    )
 
 
     x_mean = np.mean(X_train, axis=0)
@@ -63,9 +84,12 @@ def load_mit_bih(val_size=0.1, mode="design"):
         RR_val = np.concatenate([RR_all[i] for i in splits.val])
 
     
-    return {"train": ((X_train - x_mean) / (x_std + 1e-8), RR_train,y_train), 
-            "test": ((X_test - x_mean) / (x_std + 1e-8), RR_test, y_test),
-            "val": ((X_val - x_mean) / (x_std + 1e-8), RR_val, y_val) if mode == "design" else None}
+    return {
+        "train": ((X_train - x_mean) / (x_std + 1e-8), RR_train, y_train),
+        "test": ((X_test - x_mean) / (x_std + 1e-8), RR_test, y_test),
+        "val": ((X_val - x_mean) / (x_std + 1e-8), RR_val, y_val) if mode == "design" else None,
+        "matched_filters": matched_filters,
+    }
 
 
 
@@ -102,14 +126,7 @@ def _load_mit_bih(window_len=64, extension="atr", preprocess=False):
     SYM_all = {}
     RR_all = {}
 
-    half_window_len = window_len // 2 
-    AAMI_MAP = {"N":"N", "L":"N", "R":"N", "e":"N", "j":"N", 
-                            "A":"S", "a":"S", "S":"S", "J":"S", 
-                            "V":"V", "E":"V", 
-                            #"F":"F", #Removed F and Q as there are not relevant to arrhythmia detection  
-                            # "/":'Q', "f": "Q", "Q":"Q",
-                            }
-
+    half_window_len = window_len // 2
     beat_symbols = list(AAMI_MAP.keys())
 
 
@@ -178,5 +195,4 @@ def _load_mit_bih(window_len=64, extension="atr", preprocess=False):
         SYM_all[f.stem] = np.array(sym)
         RR_all[f.stem] = np.array(rr, dtype="float32")
 
-
-    return X_all, y_all, RR_all
+    return X_all, y_all, SYM_all, RR_all
