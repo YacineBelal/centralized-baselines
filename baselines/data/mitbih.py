@@ -94,11 +94,12 @@ def preprocess_ecg(signal: np.ndarray) -> np.ndarray:
     return signal
 
 
-def _load_mit_bih(window_len = 64, extension="atr"):
+def _load_mit_bih(window_len=64, extension="atr", preprocess=False):
     PACED_RECORDS = {'102', '104', '107', '217'}
     files = [f for f  in PROJECT_ROOT.iterdir() if f.is_file() and f.suffix == ".hea"]
     y_all = {}
     X_all = {}
+    SYM_all = {}
     RR_all = {}
 
     half_window_len = window_len // 2 
@@ -119,46 +120,62 @@ def _load_mit_bih(window_len = 64, extension="atr"):
 
         record = wfdb.rdrecord(record_name=f.with_suffix(''))
         annotation = wfdb.rdann(record_name=str(f.with_suffix('')), extension=extension)
-        
-        clean_signal = preprocess_ecg(record.p_signal[:, 0])
 
-        in_flutter = False 
+        clean_signal = (
+            preprocess_ecg(record.p_signal[:, 0]) if preprocess else record.p_signal[:, 0]
+        )
+
+        in_flutter = False
         in_flutter_indices = set()
         for i, sym in enumerate(annotation.symbol):
-            if sym == '[':
-                in_flutter = True 
-            elif sym == ']':
-                in_flutter = False 
+            if sym == "[":
+                in_flutter = True
+            elif sym == "]":
+                in_flutter = False
             elif in_flutter:
                 in_flutter_indices.add(i)
 
-        valid_beats = [] 
-        for i , sample_idx in enumerate(annotation.sample):
+        valid_beats = []
+        for i, sample_idx in enumerate(annotation.sample):
             if annotation.symbol[i] not in beat_symbols:
-                continue 
+                continue
             if i in in_flutter_indices:
-                continue 
-            if  sample_idx-half_window_len < 0 or sample_idx+half_window_len > record.sig_len:
-                continue  
-            
+                continue
+            if sample_idx - half_window_len < 0 or sample_idx + half_window_len > record.sig_len:
+                continue
+
             valid_beats.append((i, sample_idx, AAMI_MAP[annotation.symbol[i]]))
-       
-        x, y, rr = [], [], []
+
+        x, y, sym, rr = [], [], [], []
         
         for pos, (i, sample_idx, label) in enumerate(valid_beats):
             pre_rr  = (valid_beats[pos][1] - valid_beats[pos-1][1]) / FS if pos > 0 else 0.0
             post_rr = (valid_beats[pos+1][1] - valid_beats[pos][1]) / FS if pos < len(valid_beats)-1 else 0.0
-            local_mean_rr = np.mean(np.diff([b[1] for b in valid_beats[max(0, pos-5):pos+1]])) / FS if pos > 0 else pre_rr
-            ratio = pre_rr / post_rr if post_rr > 0 else 1.0
+            local_mean_rr = (
+                np.mean(np.diff([b[1] for b in valid_beats[max(0, pos - 80) : pos + 1]])) / FS
+                if pos > 0
+                else pre_rr
+            )
+            global_mean_rr = (
+                np.mean(np.diff([b[1] for b in valid_beats[max(0, pos - 400) : pos + 1]])) / FS
+                if pos > 0
+                else pre_rr
+            )
 
-            x.append(clean_signal[sample_idx-half_window_len:sample_idx+half_window_len])
+            pre_rr_local = pre_rr / local_mean_rr if local_mean_rr > 0 else 1.0
+            post_rr_local = post_rr / local_mean_rr if local_mean_rr > 0 else 1.0
+            pre_rr_global = pre_rr / global_mean_rr if global_mean_rr > 0 else 1.0
+            post_rr_global = post_rr / global_mean_rr if global_mean_rr > 0 else 1.0
+            rr.append([pre_rr_local, post_rr_local, pre_rr_global, post_rr_global])
+
+            seg = clean_signal[sample_idx - half_window_len : sample_idx + half_window_len]
+            x.append(seg)
             y.append(label)
-            rr.append([pre_rr, post_rr, ratio, local_mean_rr])
-
+            sym.append(annotation.symbol[i])
 
         X_all[f.stem] = np.expand_dims(np.stack(x), axis=1).astype("float32")
-        # X_all[f.stem] = np.permute_dims(np.stack(x), axes=(0,2,1)).astype("float32")
         y_all[f.stem] = np.array(y)
+        SYM_all[f.stem] = np.array(sym)
         RR_all[f.stem] = np.array(rr, dtype="float32")
 
 
