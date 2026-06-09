@@ -81,17 +81,19 @@ class MitbihDataset(Dataset):
     """Dataset for MIT-BIH data with RR intervals features.
 
     Expects an X in (C, T) format 4 RR feature.
-    Returns (X, RR, y) tuples.
+    Returns (X_deriv, RR, y) tuples.
     """
 
+    # TODO: add attribute to control whether to return deriv or X or both
     def __init__(self, X, RR, y):
         super().__init__()
-        self.x = X
-        self.rr = RR
-        self.y = y
+        self.x = torch.as_tensor(X, dtype=torch.float32)
+        self.rr = torch.as_tensor(RR, dtype=torch.float32)
+        self.y = torch.as_tensor(y, dtype=torch.long)
+        self.deriv_x = torch.diff(X, dim=1, prepend=X[..., :1])
 
     def __getitem__(self, index):
-        return self.x[index], self.rr[index], self.y[index]
+        return self.deriv_x[index], self.rr[index], self.y[index]
 
     def __len__(self):
         return len(self.y)
