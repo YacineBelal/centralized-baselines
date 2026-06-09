@@ -18,11 +18,11 @@ def main(
     dataset_name="MIT-BIH",
     model_name="CNN",
     window_len=128,
-    epochs=30,
+    epochs=1,
     batch_size=128,
     normal_class=0,  # TODO: do not provide as argument, collect instead
     lr=0.001,
-    mode="design",
+    mode="final",
     val_size=0.1,
     val_period=5,
     log_to_mlflow=True,

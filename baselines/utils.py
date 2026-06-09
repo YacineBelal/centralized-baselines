@@ -50,5 +50,11 @@ class MLFlowLogger:
     def set_tags(self, tags):
         return self.mlflow.set_tags(tags) if self.enabled else _noLoggingContext()
 
-    def log_model(self, model):
-        return self.mlflow.pytorch.log_model(model) if self.enabled else _noLoggingContext()
+    def log_model(self, model, input_example, signature):
+        return (
+            self.mlflow.pytorch.log_model(
+                model, input_example=input_example, signature=signature, serialization_format="pt2"
+            )
+            if self.enabled
+            else _noLoggingContext()
+        )

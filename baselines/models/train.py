@@ -1,5 +1,7 @@
 import copy
 
+from mlflow.models import ModelSignature
+from mlflow.types import Schema, TensorSpec
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -73,6 +75,20 @@ def train_model(
     if val_dl is not None:
         model.load_state_dict(best_model)
 
+    *inputs, y = next(iter(train_dl))
+    numpy_inputs = [x.numpy() for x in inputs]
+    input_schema = Schema(
+        [
+            TensorSpec(np.dtype("float32"), shape=inputs[0].shape, name="X"),
+            TensorSpec(np.dtype("float32"), shape=inputs[1].shape, name="RR"),
+        ]
+    )
+    output_schema = Schema([TensorSpec(np.dtype("float32"), shape=(1, 3), name="y")])
+    signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+    model.to("cpu")
     logger.log_model(
         model,
-    )  # TODO switch to pt2 deserialization format which requires input_example
+        input_example=numpy_inputs,
+        signature=signature,
+    )
+    model.to(device)
