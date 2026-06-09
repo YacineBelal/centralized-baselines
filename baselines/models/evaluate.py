@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import mlflow
 import seaborn as sns
 from sklearn.metrics import (
     average_precision_score,
@@ -7,13 +6,21 @@ from sklearn.metrics import (
     confusion_matrix,
     f1_score,
     precision_recall_curve,
+    precision_recall_fscore_support,
 )
 import torch
 from torch.utils.data import DataLoader
 
 
 def test_model(
-    model, test_dls, criterion, normal_class=0, device=torch.device("cpu"), log_artifacts=False
+    model,
+    test_dls,
+    criterion,
+    logger,
+    normal_class=0,
+    class_names=None,
+    device=torch.device("cpu"),
+    log_artifacts=False,
 ):
     """Evaluate a model across one val/test DataLoaders.
 
@@ -31,7 +38,14 @@ def test_model(
     for test_dl in test_dls:
         results.append(
             _test_model(
-                model, test_dl, criterion, normal_class, device=device, log_artifacts=log_artifacts
+                model,
+                test_dl,
+                criterion,
+                logger,
+                normal_class,
+                class_names=class_names,
+                device=device,
+                log_artifacts=log_artifacts,
             )
         )
 
@@ -39,7 +53,14 @@ def test_model(
 
 
 def _test_model(
-    model, test_dl, criterion, normal_class, device=torch.device("cpu"), log_artifacts=False
+    model,
+    test_dl,
+    criterion,
+    logger,
+    normal_class,
+    class_names=None,
+    device=torch.device("cpu"),
+    log_artifacts=False,
 ):
     generalization_error = 0.0
     predictions = []
@@ -85,7 +106,7 @@ def _test_model(
         ax.set_title("PRC Curve")
         ax.legend()
 
-        mlflow.log_figure(fig, "prc_curve.png")
+        logger.log_figure(fig, "prc_curve.png")
         plt.close(fig)
 
         cm = confusion_matrix(y_true, y_pred)
@@ -94,10 +115,10 @@ def _test_model(
         ax.set_xlabel("Predicted")
         ax.set_ylabel("True")
         ax.set_title("Confusion Matrix")
-        mlflow.log_figure(fig, "confusion_matrix.png")
+        logger.log_figure(fig, "confusion_matrix.png")
         plt.close(fig)
 
-    return {
+    results = {
         "loss": generalization_error,
         "multiclass/balanced_accuracy": accuracy,
         "multiclass/macro_f1": f1score,
@@ -105,3 +126,17 @@ def _test_model(
         "binary/balanced_accuracy": binary_accuracy,
         "binary/ap_score": ap_score,
     }
+    if class_names is not None:
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            y_true,
+            y_pred,
+            labels=list(range(len(class_names))),
+            average=None,
+            zero_division=0,
+        )
+
+        for c, name in enumerate(class_names):
+            results[f"class_{name}/precision"] = precision[c]
+            results[f"class_{name}/recall"] = recall[c]
+
+    return results

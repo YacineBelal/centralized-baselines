@@ -1,6 +1,5 @@
 import copy
 
-import mlflow
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -16,6 +15,7 @@ def train_model(
     optimizer,
     criterion,
     epochs,
+    logger,
     val_dl=None,
     val_period=5,
     tolerated_steps=3,
@@ -47,13 +47,13 @@ def train_model(
 
         empirical_risk /= len(train_dl.dataset)
         print(f"Epoch [{epoch + 1}/{epochs}] | Train loss: {empirical_risk:.4f}")
-        mlflow.log_metrics({"train/loss": empirical_risk}, step=epoch)
+        logger.log_metrics({"train/loss": empirical_risk}, step=epoch)
         if val_dl is not None and (epoch + 1) % val_period == 0:
             print(f"{'─' * 40}")
             print(f"  Validation @ epoch {epoch + 1}")
             results = test_model(model, val_dl, criterion, normal_class, device=device)
             metrics = {f"val/{k}": v for k, v in results[0].items()}
-            mlflow.log_metrics(metrics, step=epoch)
+            logger.log_metrics(metrics, step=epoch)
             if results[0]["binary/f1"] > best_f1_score:
                 best_f1_score = results[0]["binary/f1"]
                 best_model = copy.deepcopy(model.state_dict())
@@ -73,6 +73,6 @@ def train_model(
     if val_dl is not None:
         model.load_state_dict(best_model)
 
-    mlflow.pytorch.log_model(
-        model, name="multiscale_cnn"
+    logger.log_model(
+        model,
     )  # TODO switch to pt2 deserialization format which requires input_example

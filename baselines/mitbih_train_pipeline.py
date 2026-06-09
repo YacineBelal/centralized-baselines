@@ -1,5 +1,4 @@
 import fire
-import mlflow
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
 import torch
@@ -12,20 +11,21 @@ from baselines.models import (
     test_model,
     train_model,
 )
-from baselines.utils import init_randomized_envs
+from baselines.utils import MLFlowLogger, init_randomized_envs
 
 
 def main(
-    window_len=128,
+    dataset_name="MIT-BIH",
     model_name="CNN",
+    window_len=128,
     epochs=30,
     batch_size=128,
     normal_class=0,  # TODO: do not provide as argument, collect instead
     lr=0.001,
-    mode="final",
+    mode="design",
     val_size=0.1,
     val_period=5,
-    log_to_mlflow=False,
+    log_to_mlflow=True,
     seed=42,
 ):
     init_randomized_envs(seed)
@@ -41,8 +41,11 @@ def main(
         shuffle=False,
     )
 
-    mlflow.set_experiment("CNN MIT-BIH")
-    with mlflow.start_run():
+    LOGGER = MLFlowLogger(
+        enabled=log_to_mlflow, experiment_name=f"{dataset_name}/{model_name}_{mode}"
+    )
+
+    with LOGGER.start_run():
         model = build_model(model_name).to(DEVICE)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         classes = np.unique(dataset["train"][-1])
@@ -52,7 +55,7 @@ def main(
 
         weights = torch.Tensor(weights).to(DEVICE)
         criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
-        mlflow.log_params(
+        LOGGER.log_params(
             {
                 "window_len": window_len,
                 "batch_size": batch_size,
@@ -61,7 +64,8 @@ def main(
                 "optimizer": optimizer.__class__.__name__,
                 "val_size": val_size,
                 "mode": mode,
-            })
+            }
+        )
 
         if mode == "design":
             val_dl = DataLoader(
@@ -70,15 +74,27 @@ def main(
                 shuffle=False,
             )
             train_model(
-                model, train_dl, optimizer, criterion, epochs, val_dl=val_dl, val_period=val_period, normal_class=normal_class, device=DEVICE
+                model,
+                train_dl,
+                optimizer,
+                criterion,
+                epochs,
+                logger=LOGGER,
+                val_dl=val_dl,
+                val_period=val_period,
+                normal_class=normal_class,
+                device=DEVICE,
             )
         else:
-            train_model(model, train_dl, optimizer, criterion, epochs, device=DEVICE)
+            train_model(
+                model, train_dl, optimizer, criterion, epochs, logger=LOGGER, device=DEVICE
+            )
 
         results = test_model(
             model,
             test_dl,
             criterion,
+            LOGGER,
             normal_class=normal_class,
             class_names=dataset["classes_names"],
             device=DEVICE,
@@ -86,10 +102,9 @@ def main(
         )
         test_metrics = {f"test/{k}": v for k, v in results[0].items()}
         print(test_metrics)
-        if log_to_mlflow:
-            mlflow.log_metrics(test_metrics)
-            mlflow.log_text(str(model), "architecture.txt")
-            mlflow.set_tags({"model_type": model_name, "dataset": "MIT-BIH"})
+        LOGGER.log_metrics(test_metrics)
+        LOGGER.log_text(str(model), "architecture.txt")
+        LOGGER.set_tags({"model_type": model_name, "dataset": "MIT-BIH"})
 
 
 if __name__ == "__main__":
