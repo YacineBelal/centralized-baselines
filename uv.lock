@@ -197,6 +197,51 @@ wheels = [
 ]
 
 [[package]]
+name = "baselines"
+version = "0.0.1"
+source = { editable = "." }
+dependencies = [
+    { name = "fire" },
+    { name = "jupyterlab" },
+    { name = "matplotlib" },
+    { name = "mlflow" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pip" },
+    { name = "protobuf" },
+    { name = "python-dotenv" },
+    { name = "ruff" },
+    { name = "scikit-learn" },
+    { name = "seaborn" },
+    { name = "setuptools" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "tqdm" },
+    { name = "wfdb" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fire", specifier = ">=0.7.1" },
+    { name = "jupyterlab", specifier = ">=4.5.5" },
+    { name = "matplotlib", specifier = ">=3.10.8" },
+    { name = "mlflow", specifier = "==3.11.1" },
+    { name = "numpy", specifier = ">=2.4.2" },
+    { name = "pandas", specifier = "<3" },
+    { name = "pip" },
+    { name = "protobuf", specifier = ">=3.20,<4.0" },
+    { name = "python-dotenv" },
+    { name = "ruff" },
+    { name = "scikit-learn", specifier = ">=1.8.0" },
+    { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "setuptools", specifier = "<81" },
+    { name = "torch", specifier = "==2.10.0" },
+    { name = "torchvision", specifier = ">=0.25.0" },
+    { name = "tqdm", specifier = ">=4.67.3" },
+    { name = "wfdb", specifier = ">=4.3.1" },
+]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.14.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2423,51 +2468,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c8/9f/46448c4e41a4c5ee4bdb74b3758af48e5ff0faeffe40f4e301bfc7594894/skops-0.14.0.tar.gz", hash = "sha256:6c8c0e047f691a3a582c3258943eecafcbfd79c8c7eef66260f3703e363254f0", size = 608084, upload-time = "2026-04-20T18:23:55.336Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/0e/3ae19fa941522cd98e119762e7181d371c8dba0b2d72bfaf9522692e329c/skops-0.14.0-py3-none-any.whl", hash = "sha256:60a5db78a9db46ccee2139a0ba13ab5afb1c96f4749b382e75a371291bbe3e36", size = 132198, upload-time = "2026-04-20T18:23:54.018Z" },
-]
-
-[[package]]
-name = "sleep-stage-prediction"
-version = "0.0.1"
-source = { editable = "." }
-dependencies = [
-    { name = "fire" },
-    { name = "jupyterlab" },
-    { name = "matplotlib" },
-    { name = "mlflow" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pip" },
-    { name = "protobuf" },
-    { name = "python-dotenv" },
-    { name = "ruff" },
-    { name = "scikit-learn" },
-    { name = "seaborn" },
-    { name = "setuptools" },
-    { name = "torch" },
-    { name = "torchvision" },
-    { name = "tqdm" },
-    { name = "wfdb" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fire", specifier = ">=0.7.1" },
-    { name = "jupyterlab", specifier = ">=4.5.5" },
-    { name = "matplotlib", specifier = ">=3.10.8" },
-    { name = "mlflow", specifier = "==3.11.1" },
-    { name = "numpy", specifier = ">=2.4.2" },
-    { name = "pandas", specifier = "<3" },
-    { name = "pip" },
-    { name = "protobuf", specifier = ">=3.20,<4.0" },
-    { name = "python-dotenv" },
-    { name = "ruff" },
-    { name = "scikit-learn", specifier = ">=1.8.0" },
-    { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "setuptools", specifier = "<81" },
-    { name = "torch", specifier = "==2.10.0" },
-    { name = "torchvision", specifier = ">=0.25.0" },
-    { name = "tqdm", specifier = ">=4.67.3" },
-    { name = "wfdb", specifier = ">=4.3.1" },
 ]
 
 [[package]]
