@@ -90,7 +90,7 @@ class MitbihDataset(Dataset):
         self.x = torch.as_tensor(X, dtype=torch.float32)
         self.rr = torch.as_tensor(RR, dtype=torch.float32)
         self.y = torch.as_tensor(y, dtype=torch.long)
-        self.deriv_x = torch.diff(X, dim=1, prepend=X[..., :1])
+        self.deriv_x = torch.diff(self.x, dim=-1, prepend=self.x[..., :1])
 
     def __getitem__(self, index):
         return self.deriv_x[index], self.rr[index], self.y[index]
