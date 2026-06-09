@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from baselines.models.registry import register
+
 
 class ConvolutionalClassifier(nn.Module):
     def __init__(self, channel_in, kernel_size=7):
@@ -396,6 +398,7 @@ class MultiTCN(nn.Module):
         return self.fc(merged)
 
 
+@register("CNN")
 class CNN(nn.Module):
     """simple CNN with a multihead attention layer for the MIT-BIH arrhythmia detection task
 
@@ -457,6 +460,7 @@ class CNN(nn.Module):
         return self.linears(out)
 
 
+@register("tinyCNN")
 class tinyCNN(nn.Module):
     """Frugal Model based on Matched Filters proposed by (Farag et al., 23)
     for edge ECG-based arrhythmia detection.
