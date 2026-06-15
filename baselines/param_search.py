@@ -28,22 +28,27 @@ def objective(
     init_randomized_envs(seed)
     DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    window_len = trial.suggest_categorical("window_len", [32, 64, 128])
-    dataset = load_mit_bih(val_size=val_size)
-    train_dl = DataLoader(MitbihDataset(*dataset["train"]), batch_size=batch_size, shuffle=True)
-    val_dl = DataLoader(
-        MitbihDataset(*dataset["val"]),
-        batch_size=1024,
-        shuffle=False,
-    )
-
     with LOGGER.start_run(nested=True):
         params = {
-            # "window_len": window_len #FIXME,
+            "window_len": trial.suggest_int(
+                "window_len",
+                32,
+                256,
+                step=32,
+            ),
             "trainable_conv": trial.suggest_categorical("trainable_conv", [True, False]),
             "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
             "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
         }
+        dataset = load_mit_bih(val_size=val_size, window_len=params["window_len"])
+        train_dl = DataLoader(
+            MitbihDataset(*dataset["train"]), batch_size=batch_size, shuffle=True
+        )
+        val_dl = DataLoader(
+            MitbihDataset(*dataset["val"]),
+            batch_size=1024,
+            shuffle=False,
+        )
         model = build_model(
             model_name,
             matched_filters=dataset["matched_filters"],
