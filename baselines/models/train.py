@@ -3,6 +3,7 @@ import copy
 from mlflow.models import ModelSignature
 from mlflow.types import Schema, TensorSpec
 import numpy as np
+import optuna
 import torch
 from tqdm import tqdm
 
@@ -22,6 +23,7 @@ def train_model(
     val_dl=None,
     val_period=5,
     tolerated_steps=3,
+    trial: optuna.Trial = None,
     device=torch.device("cpu"),
 ):
     """Train a model for a fixed number of epochs.
@@ -56,6 +58,9 @@ def train_model(
             results = test_model(model, val_dl, criterion, logger, label_encoder, device=device)
             metrics = {f"val/{k}": v for k, v in results[0].items()}
             logger.log_metrics(metrics, step=epoch)
+            if trial:
+                trial.report(results[0]["mcc"], epoch)
+
             if results[0]["mcc"] > best_mcc:
                 best_mcc = results[0]["mcc"]
                 best_model = copy.deepcopy(model.state_dict())
@@ -71,6 +76,9 @@ def train_model(
             if tolerated_steps_ctr == 0:
                 model.load_state_dict(best_model)
                 break
+
+        if trial.should_prune():
+            raise optuna.exceptions.TrialPruned()
 
     if val_dl is not None:
         model.load_state_dict(best_model)
@@ -92,3 +100,5 @@ def train_model(
         signature=signature,
     )
     model.to(device)
+
+    return best_mcc

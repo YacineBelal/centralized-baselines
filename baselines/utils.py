@@ -28,7 +28,7 @@ class MLFlowLogger:
 
             self.mlflow = mlflow
 
-            self.mlflow.set_experiment(experiment_name=experiment_name, **kwargs)
+            self.experiment = self.mlflow.set_experiment(experiment_name=experiment_name, **kwargs)
 
     def start_run(self, **kwargs):
         return self.mlflow.start_run(**kwargs) if self.enabled else _noLoggingContext()

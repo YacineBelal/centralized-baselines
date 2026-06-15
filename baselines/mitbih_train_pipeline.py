@@ -4,6 +4,7 @@ from sklearn.utils.class_weight import compute_class_weight
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import optuna
 
 from baselines.data import MitbihDataset, load_mit_bih
 from baselines.models import (

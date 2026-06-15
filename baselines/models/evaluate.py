@@ -83,7 +83,7 @@ def _test_model(
         y_pred,
         labels=labels,
         average=None,
-        zero_division="warn",
+        zero_division=0,
     )
 
     for c, name in enumerate(cls_names):
