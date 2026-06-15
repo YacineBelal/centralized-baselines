@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import (
-    confusion_matrix,
-    precision_recall_fscore_support,
-)
+from sklearn.metrics import confusion_matrix, matthews_corrcoef, precision_recall_fscore_support
 import torch
 from torch.utils.data import DataLoader
 
@@ -76,9 +73,7 @@ def _test_model(
 
     generalization_error /= len(test_dl.dataset)
 
-    results = {
-        "loss": generalization_error,
-    }
+    results = {"loss": generalization_error, "mcc": matthews_corrcoef(y_true, y_pred)}
 
     cls_names = list(label_encoder.keys())
     labels = list(label_encoder.values())
@@ -109,6 +104,4 @@ def _test_model(
         plt.close(fig)
 
     # TODO: add roc /auc curves
-    print(cls_names)
-    print(recall)
     return results

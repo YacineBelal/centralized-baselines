@@ -31,7 +31,7 @@ def train_model(
     The last element of each batch is always treated as the target; all
     preceding elements are forwarded to the model via ``model(*inputs)``.
     """
-    best_f1_score = -np.inf
+    best_mcc = -np.inf
     tolerated_steps_ctr = tolerated_steps
     best_model = copy.deepcopy(model.state_dict())
     for epoch in tqdm(range(epochs)):
@@ -56,15 +56,15 @@ def train_model(
             results = test_model(model, val_dl, criterion, logger, label_encoder, device=device)
             metrics = {f"val/{k}": v for k, v in results[0].items()}
             logger.log_metrics(metrics, step=epoch)
-            if results[0]["macro_f1"] > best_f1_score:
-                best_f1_score = results[0]["macro_f1"]
+            if results[0]["mcc"] > best_mcc:
+                best_mcc = results[0]["mcc"]
                 best_model = copy.deepcopy(model.state_dict())
                 tolerated_steps_ctr = tolerated_steps
             else:
                 tolerated_steps_ctr -= 1
 
             print(
-                f"  loss: {metrics['val/loss']:.4f}  | balanced_accuracy: {metrics['val/balanced_accuracy']} | | macro_f1:  {metrics['val/macro_f1']:.4f}  (best f1: {best_f1_score:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
+                f"  loss: {metrics['val/loss']:.4f}  | balanced_accuracy: {metrics['val/balanced_accuracy']} | mcc:  {metrics['val/mcc']:.4f} | macro_f1:  {metrics['val/macro_f1']:.4f}  (best mcc: {best_mcc:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
             )
             print(f"{'─' * 40}")
 
