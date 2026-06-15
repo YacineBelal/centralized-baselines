@@ -18,11 +18,10 @@ def main(
     dataset_name="MIT-BIH",
     model_name="CNN",
     window_len=128,
-    epochs=1,
+    epochs=30,
     batch_size=128,
-    normal_class=0,  # TODO: do not provide as argument, collect instead
     lr=0.001,
-    mode="final",
+    mode="design",
     val_size=0.1,
     val_period=5,
     log_to_mlflow=True,
@@ -46,13 +45,10 @@ def main(
     )
 
     with LOGGER.start_run():
-        model = build_model(model_name).to(DEVICE)
+        model = build_model(name=model_name, matched_filters=dataset["matched_filters"]).to(DEVICE)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        classes = np.unique(dataset["train"][-1])
-        print(classes)
-        print(dataset["classes_names"])
+        classes = np.array(list(dataset["label_encoder"].values()))
         weights = compute_class_weight("balanced", classes=classes, y=dataset["train"][-1])
-
         weights = torch.Tensor(weights).to(DEVICE)
         criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
         LOGGER.log_params(
@@ -79,15 +75,22 @@ def main(
                 optimizer,
                 criterion,
                 epochs,
-                logger=LOGGER,
+                LOGGER,
+                dataset["label_encoder"],
                 val_dl=val_dl,
                 val_period=val_period,
-                normal_class=normal_class,
                 device=DEVICE,
             )
         else:
             train_model(
-                model, train_dl, optimizer, criterion, epochs, logger=LOGGER, device=DEVICE
+                model,
+                train_dl,
+                optimizer,
+                criterion,
+                epochs,
+                LOGGER,
+                dataset["label_encoder"],
+                device=DEVICE,
             )
 
         results = test_model(
@@ -95,8 +98,7 @@ def main(
             test_dl,
             criterion,
             LOGGER,
-            normal_class=normal_class,
-            class_names=dataset["classes_names"],
+            label_encoder=dataset["label_encoder"],
             device=DEVICE,
             log_artifacts=True,
         )

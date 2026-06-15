@@ -18,10 +18,10 @@ def train_model(
     criterion,
     epochs,
     logger,
+    label_encoder,
     val_dl=None,
     val_period=5,
     tolerated_steps=3,
-    normal_class=0,
     device=torch.device("cpu"),
 ):
     """Train a model for a fixed number of epochs.
@@ -53,18 +53,18 @@ def train_model(
         if val_dl is not None and (epoch + 1) % val_period == 0:
             print(f"{'─' * 40}")
             print(f"  Validation @ epoch {epoch + 1}")
-            results = test_model(model, val_dl, criterion, normal_class, device=device)
+            results = test_model(model, val_dl, criterion, logger, label_encoder, device=device)
             metrics = {f"val/{k}": v for k, v in results[0].items()}
             logger.log_metrics(metrics, step=epoch)
-            if results[0]["binary/f1"] > best_f1_score:
-                best_f1_score = results[0]["binary/f1"]
+            if results[0]["macro_f1"] > best_f1_score:
+                best_f1_score = results[0]["macro_f1"]
                 best_model = copy.deepcopy(model.state_dict())
                 tolerated_steps_ctr = tolerated_steps
             else:
                 tolerated_steps_ctr -= 1
 
             print(
-                f"  loss: {metrics['val/loss']:.4f}  | binary/balanced_accuracy: {metrics['val/binary/balanced_accuracy']} | multiclass/balanced_accuracy: {metrics['val/multiclass/balanced_accuracy']} | binary/f1:  {metrics['val/binary/f1']:.4f}  (best f1: {best_f1_score:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
+                f"  loss: {metrics['val/loss']:.4f}  | balanced_accuracy: {metrics['val/balanced_accuracy']} | | macro_f1:  {metrics['val/macro_f1']:.4f}  (best f1: {best_f1_score:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
             )
             print(f"{'─' * 40}")
 

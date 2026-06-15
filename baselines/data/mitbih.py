@@ -89,6 +89,7 @@ def load_mit_bih(val_size=0.1, mode="design"):
         "test": ((X_test - x_mean) / (x_std + 1e-8), RR_test, y_test),
         "val": ((X_val - x_mean) / (x_std + 1e-8), RR_val, y_val) if mode == "design" else None,
         "matched_filters": matched_filters,
+        "label_encoder": label_encoder,
     }
 
 
