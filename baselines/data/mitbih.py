@@ -26,10 +26,10 @@ AAMI_MAP = {
 FS = 360  # MIT-BIH sampling frequency
 
 
-def load_mit_bih(window_len=64, val_size=0.1, mode="design"):
+def load_mit_bih(window_len=64, val_size=0.1, preprocess=False, mode="design"):
     assert mode in ("design", "final"), f"mode must be 'design' or 'final', got {repr(mode)}"
 
-    X_all, y_all, SYM_all, RR_all = _load_mit_bih(window_len)
+    X_all, y_all, SYM_all, RR_all = _load_mit_bih(window_len=window_len, preprocess=preprocess)
     
     classes_n = np.unique(np.concatenate(list(y_all.values()), axis=0))
     label_encoder = {val: idx for idx, val in enumerate(classes_n)}
@@ -119,7 +119,7 @@ def preprocess_ecg(signal: np.ndarray) -> np.ndarray:
     return signal
 
 
-def _load_mit_bih(window_len=64, extension="atr", preprocess=False):
+def _load_mit_bih(window_len, preprocess, extension="atr"):
     PACED_RECORDS = {'102', '104', '107', '217'}
     files = [f for f  in PROJECT_ROOT.iterdir() if f.is_file() and f.suffix == ".hea"]
     y_all = {}

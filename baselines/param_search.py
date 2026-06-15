@@ -37,10 +37,13 @@ def objective(
                 step=32,
             ),
             "trainable_conv": trial.suggest_categorical("trainable_conv", [True, False]),
+            "preprocess": trial.suggest_categorical("preprocess", [True, False]),
             "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
             "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
         }
-        dataset = load_mit_bih(val_size=val_size, window_len=params["window_len"])
+        dataset = load_mit_bih(
+            val_size=val_size, window_len=params["window_len"], preprocess=params["preprocess"]
+        )
         train_dl = DataLoader(
             MitbihDataset(*dataset["train"]), batch_size=batch_size, shuffle=True
         )
