@@ -19,13 +19,10 @@ def objective(
     model_name="CNN",
     epochs=30,
     batch_size=128,
-    val_size=0.1,
-    val_period=5,
     LOGGER: MLFlowLogger = None,
     seed=42,
 ):
     init_randomized_envs(seed)
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     with LOGGER.start_run(nested=True):
         params = {
@@ -40,27 +37,42 @@ def objective(
             "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
             "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
         }
-        dataset = load_mit_bih(
-            val_size=val_size, window_len=params["window_len"], preprocess=params["preprocess"]
-        )
+        performances = intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size)
+
+        LOGGER.log_params(params)
+        LOGGER.log_metrics({"mcc": sum(performances) / len(performances)})
+        
+        return sum(performances) / len(performances)
+
+
+
+def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size):
+
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") #TODO: outside 
+    dataset = load_mit_bih(
+        mode="CV", window_len=params["window_len"], preprocess=params["preprocess"], k_folds=22,
+    )
+    performances = []
+    for fold in dataset["folds"]:
         train_dl = DataLoader(
-            MitbihDataset(*dataset["train"]), batch_size=batch_size, shuffle=True
+            MitbihDataset(*fold["train"]), batch_size=batch_size, shuffle=True
         )
         val_dl = DataLoader(
-            MitbihDataset(*dataset["val"]),
+            MitbihDataset(*fold["val"]),
             batch_size=1024,
             shuffle=False,
         )
         model = build_model(
             model_name,
-            matched_filters=dataset["matched_filters"],
+            matched_filters=fold["matched_filters"],
             trainable_conv=params["trainable_conv"],
         ).to(DEVICE)
+
         optimizer = getattr(torch.optim, params["optimizer_name"])(
             model.parameters(), lr=params["learning_rate"]
         )
         classes = np.array(list(dataset["label_encoder"].values()))
-        weights = compute_class_weight("balanced", classes=classes, y=dataset["train"][-1])
+        weights = compute_class_weight("balanced", classes=classes, y=fold["train"][-1])
         weights = torch.Tensor(weights).to(DEVICE)
         criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
 
@@ -73,14 +85,13 @@ def objective(
             LOGGER,
             dataset["label_encoder"],
             val_dl=val_dl,
-            val_period=val_period,
             device=DEVICE,
             trial=trial,
         )
-        LOGGER.log_params(params)
-        LOGGER.log_metrics({"mcc": performance})
 
-    return performance
+        performances.append(performance)
+
+    return performances
 
 
 def main(
