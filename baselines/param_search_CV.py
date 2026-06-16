@@ -28,12 +28,12 @@ def objective(
             "window_len": trial.suggest_int(
                 "window_len",
                 32,
-                256,
+                128,
                 step=32,
             ),
             "trainable_conv": trial.suggest_categorical("trainable_conv", [True, False]),
             "preprocess": trial.suggest_categorical("preprocess", [True, False]),
-            "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
+            "learning_rate": trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True),
             "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
         }
 
@@ -61,7 +61,9 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
     accs = []
 
     for fold_idx, fold in enumerate(dataset["folds"]):
-        train_dl = DataLoader(MitbihDataset(*fold["train"]), batch_size=batch_size, shuffle=True)
+        train_dl = DataLoader(
+            MitbihDataset(*fold["train"]), batch_size=batch_size, drop_last=True, shuffle=True
+        )
         val_dl = DataLoader(
             MitbihDataset(*fold["val"]),
             batch_size=1024,
