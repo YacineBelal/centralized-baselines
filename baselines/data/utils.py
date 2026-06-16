@@ -199,7 +199,7 @@ def aami_split(mode="design", val_size=0.2, rng=None):
     if rng is not None:
         train_records = rng.permutation(train_records).tolist()
 
-    if mode == "final":
+    if mode == "final" or mode == "CV":
         return DataSplit(train=train_records, test=test_records)
 
     n_val = max(1, int(len(train_records) * val_size))

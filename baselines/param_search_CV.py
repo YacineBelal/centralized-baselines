@@ -16,10 +16,11 @@ from baselines.utils import MLFlowLogger, init_randomized_envs
 
 def objective(
     trial,
+    LOGGER: MLFlowLogger,
     model_name="CNN",
     epochs=30,
     batch_size=128,
-    LOGGER: MLFlowLogger = None,
+    device=torch.device("cpu"),
     seed=42,
 ):
     init_randomized_envs(seed)
@@ -37,7 +38,10 @@ def objective(
             "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
             "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
         }
-        performances = intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size)
+        print(params)
+        performances = intra_fold_objective(
+            trial, LOGGER, params, model_name, epochs, batch_size, device
+        )
 
         LOGGER.log_params(params)
         LOGGER.log_metrics({"mcc": sum(performances) / len(performances)})
@@ -46,17 +50,17 @@ def objective(
 
 
 
-def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size):
+def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, device):
 
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") #TODO: outside 
     dataset = load_mit_bih(
-        mode="CV", window_len=params["window_len"], preprocess=params["preprocess"], k_folds=22,
+        mode="CV",
+        window_len=params["window_len"],
+        preprocess=params["preprocess"],
+        k_folds=22,
     )
     performances = []
     for fold in dataset["folds"]:
-        train_dl = DataLoader(
-            MitbihDataset(*fold["train"]), batch_size=batch_size, shuffle=True
-        )
+        train_dl = DataLoader(MitbihDataset(*fold["train"]), batch_size=batch_size, shuffle=True)
         val_dl = DataLoader(
             MitbihDataset(*fold["val"]),
             batch_size=1024,
@@ -66,14 +70,14 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size):
             model_name,
             matched_filters=fold["matched_filters"],
             trainable_conv=params["trainable_conv"],
-        ).to(DEVICE)
+        ).to(device)
 
         optimizer = getattr(torch.optim, params["optimizer_name"])(
             model.parameters(), lr=params["learning_rate"]
         )
         classes = np.array(list(dataset["label_encoder"].values()))
         weights = compute_class_weight("balanced", classes=classes, y=fold["train"][-1])
-        weights = torch.Tensor(weights).to(DEVICE)
+        weights = torch.Tensor(weights).to(device)
         criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
 
         performance = train_model(
@@ -85,7 +89,7 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size):
             LOGGER,
             dataset["label_encoder"],
             val_dl=val_dl,
-            device=DEVICE,
+            device=device,
             trial=trial,
         )
 
@@ -102,15 +106,16 @@ def main(
     log_to_mlflow=True,
     seed=42,
 ):
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # TODO: outside
 
     LOGGER = MLFlowLogger(log_to_mlflow, experiment_name=f"{dataset_name}/{model_name}_search")
+
     with LOGGER.start_run(experiment_id=LOGGER.experiment.experiment_id, nested=True):
         study = optuna.create_study(direction="maximize")
         study.optimize(
-            lambda trial: objective(
-                trial, dataset_name, model_name, epochs, batch_size, LOGGER=LOGGER
-            ),
+            lambda trial: objective(trial, LOGGER, model_name, epochs, batch_size, device=DEVICE),
             n_trials=10,
+            n_jobs=10,
         )
 
         LOGGER.log_params(study.best_params)
