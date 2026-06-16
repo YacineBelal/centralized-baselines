@@ -36,13 +36,14 @@ def objective(
             "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
             "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
         }
-        mean_performance = intra_fold_objective(
+
+        mcc, f1, min_f1, acc = intra_fold_objective(
             trial, LOGGER, params, model_name, epochs, batch_size, device
         )
         LOGGER.log_params(params)
-        LOGGER.log_metrics({"mcc": mean_performance})
+        LOGGER.log_metrics({"macro_f1": f1, "mcc": mcc, "min_f1": min_f1, "balanced_acc": acc})
 
-        return mean_performance
+        return mcc
 
 
 
@@ -54,7 +55,11 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
         preprocess=params["preprocess"],
         k_folds=22,
     )
-    performances = []
+    min_f1s = []
+    mccs = []
+    f1s = []
+    accs = []
+
     for fold_idx, fold in enumerate(dataset["folds"]):
         train_dl = DataLoader(MitbihDataset(*fold["train"]), batch_size=batch_size, shuffle=True)
         val_dl = DataLoader(
@@ -76,7 +81,7 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
         weights = torch.Tensor(weights).to(device)
         criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
 
-        performance = train_model(
+        results = train_model(
             model,
             train_dl,
             optimizer,
@@ -88,20 +93,24 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
             device=device,
         )
 
-        performances.append(performance)
-        running_mean = np.mean(performances)
+        mccs.append(results["mcc"])
+        accs.append(results["balanced_acc"])
+        f1s.append(results["macro_f1"])
+        min_f1s.append(results["min_f1"])
+
+        running_mean = np.mean(f1s)
         trial.report(running_mean, step=fold_idx)
 
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
-    return running_mean
+    return np.mean(mccs), np.mean(f1s), np.mean(min_f1s), np.mean(accs)
 
 
 def main(
     dataset_name="MIT-BIH",
     model_name="tinyCNN",
-    epochs=30,
+    epochs=5,
     batch_size=128,
     log_to_mlflow=True,
     seed=42,
@@ -118,10 +127,12 @@ def main(
         )
         study.optimize(
             lambda trial: objective(trial, LOGGER, model_name, epochs, batch_size, device=DEVICE),
-            n_trials=10,
-            n_jobs=10,
+            n_trials=5,
+            n_jobs=1,
         )
 
+        print(study.best_params)
+        print(study.best_value)
         LOGGER.log_params(study.best_params)
         LOGGER.log_metrics({"best_mcc": study.best_value})
 
