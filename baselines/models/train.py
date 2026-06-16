@@ -24,6 +24,7 @@ def train_model(
     val_period=5,
     tolerated_steps=3,
     trial: optuna.Trial = None,
+    save_model: bool = False,
     device=torch.device("cpu"),
 ):
     """Train a model for a fixed number of epochs.
@@ -77,28 +78,29 @@ def train_model(
                 model.load_state_dict(best_model)
                 break
 
-        if trial.should_prune():
+        if trial and trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
     if val_dl is not None:
         model.load_state_dict(best_model)
 
-    *inputs, y = next(iter(train_dl))
-    numpy_inputs = [x.numpy() for x in inputs]
-    input_schema = Schema(
-        [
-            TensorSpec(np.dtype("float32"), shape=inputs[0].shape, name="X"),
-            TensorSpec(np.dtype("float32"), shape=inputs[1].shape, name="RR"),
-        ]
-    )
-    output_schema = Schema([TensorSpec(np.dtype("float32"), shape=(1, 3), name="y")])
-    signature = ModelSignature(inputs=input_schema, outputs=output_schema)
-    model.to("cpu")
-    logger.log_model(
-        model,
-        input_example=numpy_inputs,
-        signature=signature,
-    )
-    model.to(device)
+    if save_model:
+        *inputs, y = next(iter(train_dl))
+        numpy_inputs = [x.numpy() for x in inputs]
+        input_schema = Schema(
+            [
+                TensorSpec(np.dtype("float32"), shape=inputs[0].shape, name="X"),
+                TensorSpec(np.dtype("float32"), shape=inputs[1].shape, name="RR"),
+            ]
+        )
+        output_schema = Schema([TensorSpec(np.dtype("float32"), shape=(1, 3), name="y")])
+        signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+        model.to("cpu")
+        logger.log_model(
+            model,
+            input_example=numpy_inputs,
+            signature=signature,
+        )
+        model.to(device)
 
     return best_mcc
