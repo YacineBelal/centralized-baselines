@@ -17,13 +17,11 @@ from baselines.utils import MLFlowLogger, init_randomized_envs
 def objective(
     trial,
     LOGGER: MLFlowLogger,
-    model_name="CNN",
-    epochs=30,
-    batch_size=128,
+    model_name,
+    epochs,
+    batch_size,
     device=torch.device("cpu"),
-    seed=42,
 ):
-    init_randomized_envs(seed)
 
     with LOGGER.start_run(nested=True):
         params = {
@@ -38,15 +36,13 @@ def objective(
             "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
             "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
         }
-        print(params)
-        performances = intra_fold_objective(
+        mean_performance = intra_fold_objective(
             trial, LOGGER, params, model_name, epochs, batch_size, device
         )
-
         LOGGER.log_params(params)
-        LOGGER.log_metrics({"mcc": sum(performances) / len(performances)})
-        
-        return sum(performances) / len(performances)
+        LOGGER.log_metrics({"mcc": mean_performance})
+
+        return mean_performance
 
 
 
@@ -59,7 +55,7 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
         k_folds=22,
     )
     performances = []
-    for fold in dataset["folds"]:
+    for fold_idx, fold in enumerate(dataset["folds"]):
         train_dl = DataLoader(MitbihDataset(*fold["train"]), batch_size=batch_size, shuffle=True)
         val_dl = DataLoader(
             MitbihDataset(*fold["val"]),
@@ -90,12 +86,16 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
             dataset["label_encoder"],
             val_dl=val_dl,
             device=device,
-            trial=trial,
         )
 
         performances.append(performance)
+        running_mean = np.mean(performances)
+        trial.report(running_mean, step=fold_idx)
 
-    return performances
+        if trial.should_prune():
+            raise optuna.exceptions.TrialPruned()
+
+    return running_mean
 
 
 def main(
@@ -106,12 +106,16 @@ def main(
     log_to_mlflow=True,
     seed=42,
 ):
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # TODO: outside
-
+    init_randomized_envs(seed)
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     LOGGER = MLFlowLogger(log_to_mlflow, experiment_name=f"{dataset_name}/{model_name}_search")
 
-    with LOGGER.start_run(experiment_id=LOGGER.experiment.experiment_id, nested=True):
-        study = optuna.create_study(direction="maximize")
+    with LOGGER.start_run(experiment_id=LOGGER.experiment.experiment_id):
+        study = optuna.create_study(
+            direction="maximize",
+            sampler=optuna.samplers.TPESampler(),
+            pruner=optuna.pruners.HyperbandPruner(),
+        )
         study.optimize(
             lambda trial: objective(trial, LOGGER, model_name, epochs, batch_size, device=DEVICE),
             n_trials=10,
