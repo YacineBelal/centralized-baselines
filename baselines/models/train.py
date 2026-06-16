@@ -1,4 +1,5 @@
 import copy
+from typing import Optional
 
 from mlflow.models import ModelSignature
 from mlflow.types import Schema, TensorSpec
@@ -23,7 +24,8 @@ def train_model(
     val_dl=None,
     val_period=5,
     tolerated_steps=3,
-    trial: optuna.Trial = None,
+    trial: Optional[optuna.Trial] = None,
+    log_iter_metrics: bool = False,  # Whether to log val metrics every each val_period
     save_model: bool = False,
     device=torch.device("cpu"),
 ):
@@ -35,6 +37,9 @@ def train_model(
     preceding elements are forwarded to the model via ``model(*inputs)``.
     """
     best_mcc = -np.inf
+    best_f1 = -np.inf
+    best_bacc = -np.inf
+
     tolerated_steps_ctr = tolerated_steps
     best_model = copy.deepcopy(model.state_dict())
     for epoch in tqdm(range(epochs)):
@@ -57,22 +62,25 @@ def train_model(
             print(f"{'─' * 40}")
             print(f"  Validation @ epoch {epoch + 1}")
             results = test_model(model, val_dl, criterion, logger, label_encoder, device=device)
-            metrics = {f"val/{k}": v for k, v in results[0].items()}
-            logger.log_metrics(metrics, step=epoch)
-            if trial:
-                trial.report(results[0]["mcc"], epoch)
-
             if results[0]["mcc"] > best_mcc:
                 best_mcc = results[0]["mcc"]
+                best_f1 = results[0]["macro_f1"]
+                best_bacc = results[0]["balanced_accuracy"]
                 best_model = copy.deepcopy(model.state_dict())
                 tolerated_steps_ctr = tolerated_steps
             else:
                 tolerated_steps_ctr -= 1
 
             print(
-                f"  loss: {metrics['val/loss']:.4f}  | balanced_accuracy: {metrics['val/balanced_accuracy']} | mcc:  {metrics['val/mcc']:.4f} | macro_f1:  {metrics['val/macro_f1']:.4f}  (best mcc: {best_mcc:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
+                f"  loss: {results[0]['loss']:.4f}  | balanced_accuracy: {results[0]['balanced_accuracy']} | mcc:  {results[0]['mcc']:.4f} | macro_f1:  {results[0]['macro_f1']:.4f}  (best mcc: {best_mcc:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
             )
             print(f"{'─' * 40}")
+
+            if log_iter_metrics:
+                metrics = {f"val/{k}": v for k, v in results[0].items()}
+                logger.log_metrics(metrics, step=epoch)
+                if trial:
+                    trial.report(results[0]["mcc"], epoch)
 
             if tolerated_steps_ctr == 0:
                 model.load_state_dict(best_model)
