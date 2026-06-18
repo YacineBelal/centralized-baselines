@@ -71,7 +71,7 @@ def _test_model(
     y_pred = torch.cat(predictions)
     y_true = torch.cat(targets)
 
-    generalization_error /= len(test_dl.dataset)
+    generalization_error /= len(test_dl)
 
     results = {"loss": generalization_error, "mcc": matthews_corrcoef(y_true, y_pred)}
 

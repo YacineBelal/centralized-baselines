@@ -23,13 +23,20 @@ def objective(
     device=torch.device("cpu"),
 ):
 
-    with LOGGER.start_run(nested=True):
-        params = {
-            "use_derivative": trial.suggest_categorical("use_derivative", [True, False]),
-            "trainable_conv": trial.suggest_categorical("trainable_conv", [True, False]),
-            "learning_rate": trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True),
-            "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD"]),
-        }
+    params = {
+        "use_derivative": trial.suggest_categorical("use_derivative", [True, False]),
+        "trainable_conv": trial.suggest_categorical("trainable_conv", [True, False]),
+        "learning_rate": trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True),
+        "optimizer_name": trial.suggest_categorical("optimizer", ["Adam"]),
+        "model_arch": trial.suggest_categorical("model_arch", ["tinyCNN"]),
+    }
+
+    run_name = (
+        f"{params['model_arch']}_lr={params['learning_rate']:.2e}_opt={params['optimizer_name']}"
+    )
+    if params["model_arch"] == "tinyCNN":
+        run_name += f"_deriv={params['use_derivative']}_train_conv={params['trainable_conv']}"
+    with LOGGER.start_run(nested=True, run_name=run_name):
         dataset = load_mit_bih(
             mode="CV",
             window_len=64,
@@ -67,7 +74,7 @@ def intra_fold_objective(trial, LOGGER, dataset, params, model_name, epochs, bat
             shuffle=False,
         )
         model = build_model(
-            model_name,
+            params["model_arch"],
             matched_filters=fold["matched_filters"],
             trainable_conv=params["trainable_conv"],
         ).to(device)
@@ -90,6 +97,7 @@ def intra_fold_objective(trial, LOGGER, dataset, params, model_name, epochs, bat
             dataset["label_encoder"],
             val_dl=val_dl,
             device=device,
+            tolerated_steps=25,
         )
 
         mccs.append(results["mcc"])
@@ -109,8 +117,8 @@ def intra_fold_objective(trial, LOGGER, dataset, params, model_name, epochs, bat
 def main(
     dataset_name="MIT-BIH",
     model_name="tinyCNN",
-    epochs=10,
-    batch_size=128,
+    epochs=400,
+    batch_size=512,
     log_to_mlflow=True,
     seed=42,
 ):
@@ -126,14 +134,13 @@ def main(
         )
         study.optimize(
             lambda trial: objective(trial, LOGGER, model_name, epochs, batch_size, device=DEVICE),
-            n_trials=10,
-            n_jobs=2,
+            n_trials=50,
+            n_jobs=1,
         )
 
         print(study.best_params)
         print(study.best_value)
         LOGGER.log_params(study.best_params)
-        LOGGER.log_metrics({"best_mcc": study.best_value})
 
 
 if __name__ == "__main__":
