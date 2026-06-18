@@ -513,7 +513,7 @@ class tinyCNN(nn.Module):
                 nn.init.zeros_(layer.bias)
 
     def forward(self, X, rr):
-        conv_out = nn.functional.conv1d(input=X, weight=self.mf)
+        conv_out = nn.functional.conv1d(input=X, weight=self.mf, padding="same")
         conv_out = self.post_convolution(conv_out)
         rr_path_out = self.rr_path(rr)
         return self.merger(torch.cat([conv_out.squeeze(-1), rr_path_out], dim=1))
