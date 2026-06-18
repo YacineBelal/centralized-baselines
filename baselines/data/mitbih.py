@@ -28,10 +28,17 @@ AAMI_MAP = {
 FS = 360  # MIT-BIH sampling frequency
 
 
-def load_mit_bih(window_len=64, val_size=0.1, preprocess=False, mode="design", k_folds=None):
+def load_mit_bih(
+    window_len=64,
+    val_size=0.1,
+    preprocess=False,
+    target_frequency=128,
+    mode="design",
+    k_folds=None,
+):
     assert mode in ("design", "CV", "final")
 
-    X_all, y_all, SYM_all, RR_all = _load_mit_bih(window_len=window_len, preprocess=preprocess)
+    X_all, y_all, SYM_all, RR_all = _load_mit_bih(window_len, preprocess, target_frequency)
 
     classes_n = np.unique(np.concatenate(list(y_all.values())))
     label_encoder = {val: idx for idx, val in enumerate(classes_n)}
@@ -57,7 +64,7 @@ def load_mit_bih(window_len=64, val_size=0.1, preprocess=False, mode="design", k
                 train_records, val_records, X_all, y_all_encoded, RR_all, SYM_all, beat_symbols
             )
             # normalize test with this fold's stats
-            fold["test"] = ((X_test - fold["x_mean"]) / (fold["x_std"] + 1e-8), RR_test, y_test)
+            fold["test"] = (X_test, RR_test, y_test)
             folds.append(fold)
         return {"folds": folds, "label_encoder": label_encoder}
 
@@ -66,7 +73,7 @@ def load_mit_bih(window_len=64, val_size=0.1, preprocess=False, mode="design", k
         fold = _build_fold(
             splits.train, val_records, X_all, y_all_encoded, RR_all, SYM_all, beat_symbols
         )
-        fold["test"] = ((X_test - fold["x_mean"]) / (fold["x_std"] + 1e-8), RR_test, y_test)
+        fold["test"] = (X_test, RR_test, y_test)
         fold["label_encoder"] = label_encoder
         return fold
 
@@ -124,7 +131,7 @@ def _preprocess_ecg(signal: np.ndarray) -> np.ndarray:
     return signal
 
 
-def _load_mit_bih(window_len, preprocess, target_frequency=128, extension="atr"):
+def _load_mit_bih(window_len, preprocess, target_frequency, extension="atr"):
     PACED_RECORDS = {"102", "104", "107", "217"}
     files = [f for f in PROJECT_ROOT.iterdir() if f.is_file() and f.suffix == ".hea"]
     y_all = {}
