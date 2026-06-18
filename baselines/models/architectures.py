@@ -488,7 +488,7 @@ class tinyCNN(nn.Module):
         self.post_convolution = nn.Sequential(
             nn.BatchNorm1d(n_filters),
             nn.Tanh(),
-            nn.AdaptiveAvgPool1d(1),
+            nn.AdaptiveMaxPool1d(1),
         )
 
         self.rr_path = nn.Sequential(
@@ -516,4 +516,4 @@ class tinyCNN(nn.Module):
         conv_out = nn.functional.conv1d(input=X, weight=self.mf)
         conv_out = self.post_convolution(conv_out)
         rr_path_out = self.rr_path(rr)
-        return self.merger(torch.cat([conv_out.squeeze(), rr_path_out], dim=1))
+        return self.merger(torch.cat([conv_out.squeeze(-1), rr_path_out], dim=1))
