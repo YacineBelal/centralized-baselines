@@ -1,7 +1,8 @@
+from math import gcd
 from pathlib import Path
 
 import numpy as np
-from scipy.signal import filtfilt, firwin
+from scipy.signal import filtfilt, firwin, resample_poly
 from sklearn.model_selection import KFold
 import wfdb
 
@@ -129,13 +130,17 @@ def _preprocess_ecg(signal: np.ndarray) -> np.ndarray:
     return signal
 
 
-def _load_mit_bih(window_len, preprocess, extension="atr"):
+def _load_mit_bih(window_len, preprocess, target_frequency=128, extension="atr"):
     PACED_RECORDS = {"102", "104", "107", "217"}
     files = [f for f in PROJECT_ROOT.iterdir() if f.is_file() and f.suffix == ".hea"]
     y_all = {}
     X_all = {}
     SYM_all = {}
     RR_all = {}
+
+    g = gcd(FS, target_frequency)
+    up = target_frequency // g
+    down = FS // g
 
     half_window_len = window_len // 2
     beat_symbols = list(AAMI_MAP.keys())
@@ -147,8 +152,12 @@ def _load_mit_bih(window_len, preprocess, extension="atr"):
         record = wfdb.rdrecord(record_name=f.with_suffix(""))
         annotation = wfdb.rdann(record_name=str(f.with_suffix("")), extension=extension)
 
-        clean_signal = (
-            _preprocess_ecg(record.p_signal[:, 0]) if preprocess else record.p_signal[:, 0]
+        resampled_signal = resample_poly(record.p_signal[:, 0], up, down)
+        clean_signal = _preprocess_ecg(resampled_signal) if preprocess else resampled_signal
+        resampled_sig_len = len(clean_signal)
+
+        resampled_samples = np.round(np.array(annotation.sample) * (target_frequency / FS)).astype(
+            int
         )
 
         in_flutter = False
@@ -162,12 +171,15 @@ def _load_mit_bih(window_len, preprocess, extension="atr"):
                 in_flutter_indices.add(i)
 
         valid_beats = []
-        for i, sample_idx in enumerate(annotation.sample):
+        for i, sample_idx in enumerate(resampled_samples):
             if annotation.symbol[i] not in beat_symbols:
                 continue
             if i in in_flutter_indices:
                 continue
-            if sample_idx - half_window_len < 0 or sample_idx + half_window_len > record.sig_len:
+            if (
+                sample_idx - half_window_len < 0
+                or sample_idx + half_window_len > resampled_sig_len
+            ):
                 continue
 
             valid_beats.append((i, sample_idx, AAMI_MAP[annotation.symbol[i]]))
@@ -175,19 +187,25 @@ def _load_mit_bih(window_len, preprocess, extension="atr"):
         x, y, sym, rr = [], [], [], []
 
         for pos, (i, sample_idx, label) in enumerate(valid_beats):
-            pre_rr = (valid_beats[pos][1] - valid_beats[pos - 1][1]) / FS if pos > 0 else 0.0
+            pre_rr = (
+                (valid_beats[pos][1] - valid_beats[pos - 1][1]) / target_frequency
+                if pos > 0
+                else 0.0
+            )
             post_rr = (
-                (valid_beats[pos + 1][1] - valid_beats[pos][1]) / FS
+                (valid_beats[pos + 1][1] - valid_beats[pos][1]) / target_frequency
                 if pos < len(valid_beats) - 1
                 else 0.0
             )
             local_mean_rr = (
-                np.mean(np.diff([b[1] for b in valid_beats[max(0, pos - 80) : pos + 1]])) / FS
+                np.mean(np.diff([b[1] for b in valid_beats[max(0, pos - 80) : pos + 1]]))
+                / target_frequency
                 if pos > 0
                 else pre_rr
             )
             global_mean_rr = (
-                np.mean(np.diff([b[1] for b in valid_beats[max(0, pos - 400) : pos + 1]])) / FS
+                np.mean(np.diff([b[1] for b in valid_beats[max(0, pos - 400) : pos + 1]]))
+                / target_frequency
                 if pos > 0
                 else pre_rr
             )
