@@ -85,23 +85,17 @@ def _build_fold(
         [X_train[sym_train == s].mean(axis=0) for s in beat_symbols if (sym_train == s).any()]
     ).astype("float32")
 
-    # normalize
-    x_mean = np.mean(X_train, axis=0)
-    x_std = np.std(X_train, axis=0)
-    X_train = (X_train - x_mean) / (x_std + 1e-8)
 
     fold = {
         "train": (X_train, RR_train, y_train),
         "matched_filters": matched_filters,
-        "x_mean": x_mean,
-        "x_std": x_std,
     }
 
     if record_ids_val is not None:
         X_val = np.concatenate([X_all[pid] for pid in record_ids_val])
         y_val = np.concatenate([y_all_encoded[pid] for pid in record_ids_val])
         RR_val = np.concatenate([RR_all[pid] for pid in record_ids_val])
-        fold["val"] = ((X_val - x_mean) / (x_std + 1e-8), RR_val, y_val)
+        fold["val"] = (X_val, RR_val, y_val)
     else:
         fold["val"] = None
 
