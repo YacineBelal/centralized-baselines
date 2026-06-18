@@ -25,20 +25,21 @@ def objective(
 
     with LOGGER.start_run(nested=True):
         params = {
-            "window_len": trial.suggest_int(
-                "window_len",
-                32,
-                128,
-                step=32,
-            ),
+            "use_derivative": trial.suggest_categorical("use_derivative", [True, False]),
             "trainable_conv": trial.suggest_categorical("trainable_conv", [True, False]),
-            "preprocess": trial.suggest_categorical("preprocess", [True, False]),
             "learning_rate": trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True),
-            "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD", "RMSprop"]),
+            "optimizer_name": trial.suggest_categorical("optimizer", ["Adam", "SGD"]),
         }
-
+        dataset = load_mit_bih(
+            mode="CV",
+            window_len=64,
+            preprocess=False,
+            target_frequency=128,
+            k_folds=22,
+        )
+        print(f"Starting trial {trial.number}")
         mcc, f1, min_f1, acc = intra_fold_objective(
-            trial, LOGGER, params, model_name, epochs, batch_size, device
+            trial, LOGGER, dataset, params, model_name, epochs, batch_size, device
         )
         LOGGER.log_params(params)
         LOGGER.log_metrics({"macro_f1": f1, "mcc": mcc, "min_f1": min_f1, "balanced_acc": acc})
@@ -46,15 +47,8 @@ def objective(
         return mcc
 
 
+def intra_fold_objective(trial, LOGGER, dataset, params, model_name, epochs, batch_size, device):
 
-def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, device):
-
-    dataset = load_mit_bih(
-        mode="CV",
-        window_len=params["window_len"],
-        preprocess=params["preprocess"],
-        k_folds=22,
-    )
     min_f1s = []
     mccs = []
     f1s = []
@@ -62,10 +56,13 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
 
     for fold_idx, fold in enumerate(dataset["folds"]):
         train_dl = DataLoader(
-            MitbihDataset(*fold["train"]), batch_size=batch_size, drop_last=True, shuffle=True
+            MitbihDataset(*fold["train"], get_deriv=params["use_derivative"]),
+            batch_size=batch_size,
+            drop_last=True,
+            shuffle=True,
         )
         val_dl = DataLoader(
-            MitbihDataset(*fold["val"]),
+            MitbihDataset(*fold["val"], get_deriv=params["use_derivative"]),
             batch_size=1024,
             shuffle=False,
         )
@@ -81,7 +78,7 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
         classes = np.array(list(dataset["label_encoder"].values()))
         weights = compute_class_weight("balanced", classes=classes, y=fold["train"][-1])
         weights = torch.Tensor(weights).to(device)
-        criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
+        criterion = nn.CrossEntropyLoss(weight=weights)
 
         results = train_model(
             model,
@@ -112,7 +109,7 @@ def intra_fold_objective(trial, LOGGER, params, model_name, epochs, batch_size, 
 def main(
     dataset_name="MIT-BIH",
     model_name="tinyCNN",
-    epochs=5,
+    epochs=10,
     batch_size=128,
     log_to_mlflow=True,
     seed=42,
@@ -129,8 +126,8 @@ def main(
         )
         study.optimize(
             lambda trial: objective(trial, LOGGER, model_name, epochs, batch_size, device=DEVICE),
-            n_trials=5,
-            n_jobs=1,
+            n_trials=10,
+            n_jobs=2,
         )
 
         print(study.best_params)

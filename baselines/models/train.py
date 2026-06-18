@@ -53,13 +53,13 @@ def train_model(
             optimizer.step()
             empirical_risk += loss.item()
 
-        empirical_risk /= len(train_dl.dataset)
-        print(f"Epoch [{epoch + 1}/{epochs}] | Train loss: {empirical_risk:.4f}")
+        empirical_risk /= len(train_dl)
+        # print(f"Epoch [{epoch + 1}/{epochs}] | Train loss: {empirical_risk:.4f}")
         if log_iter_metrics:
             logger.log_metrics({"train/loss": empirical_risk}, step=epoch)
         if val_dl is not None and (epoch + 1) % val_period == 0:
-            print(f"{'─' * 40}")
-            print(f"  Validation @ epoch {epoch + 1}")
+            # print(f"{'─' * 40}")
+            # print(f"  Validation @ epoch {epoch + 1}")
             results = test_model(model, val_dl, criterion, logger, label_encoder, device=device)
             min_f1_score = min(
                 [results[0][f"class_{name}/f1_score"] for name in label_encoder.keys()]
@@ -78,7 +78,7 @@ def train_model(
             print(
                 f"  loss: {results[0]['loss']:.4f}  macro_f1:  {results[0]['macro_f1']:.4f} | mcc:  {results[0]['mcc']:.4f} | min_f1_score: {min_f1_score} | balanced_acc: {results[0]['balanced_accuracy']} (best_macro_f1: {best_f1:.4f} patience: {tolerated_steps_ctr}/{tolerated_steps})"
             )
-            print(f"{'─' * 40}")
+            # print(f"{'─' * 40}")
 
             if log_iter_metrics:
                 metrics = {f"val/{k}": v for k, v in results[0].items()}
