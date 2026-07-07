@@ -400,7 +400,7 @@ class MultiTCN(nn.Module):
 
 @register("CNN")
 class CNN(nn.Module):
-    """simple CNN with a multihead attention layer for the MIT-BIH arrhythmia detection task
+    """CNN (+ optional multihead attention) for the MIT-BIH arrhythmia detection task.
 
     Inputs:
         X (B, 1, window_len)
@@ -408,35 +408,64 @@ class CNN(nn.Module):
     Outputs: (B, 3) logits
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        window_len=128,
+        n_conv_layers=3,
+        base_channels=16,
+        kernel_size=3,
+        use_attention=True,
+        downsample="maxpool",  # "maxpool" or "stride"
+        head="flatten",  # "flatten" or "gap"
+        num_heads=4,
+        attn_dropout=0.2,
+        conv_dropout=0.2,
+        head_dropout=0.3,
+    ):
         super().__init__()
-        self.convolutions = nn.Sequential(
-            nn.Conv1d(1, 16, kernel_size=3, padding=1),
-            nn.BatchNorm1d(16),
-            nn.ReLU(),
-            nn.MaxPool1d(2),
-            nn.Dropout(0.2),
-            nn.Conv1d(16, 32, kernel_size=3, padding=1),
-            nn.BatchNorm1d(32),
-            nn.ReLU(),
-            nn.MaxPool1d(2),
-            nn.Dropout(0.2),
-            nn.Conv1d(32, 64, kernel_size=3, padding=1),
-            nn.BatchNorm1d(64),
-            nn.ReLU(),
-            nn.MaxPool1d(2),
-            nn.Dropout(0.2),
-        )
+        self.use_attention = use_attention
+        self.head = head
 
-        self.attention = nn.MultiheadAttention(
-            embed_dim=64, num_heads=4, dropout=0.2, batch_first=True
-        )
-        self.norm = nn.LayerNorm(64)
+        def conv_block(in_c, out_c):
+            layers = []
+            if downsample == "stride":
+                layers.append(
+                    nn.Conv1d(in_c, out_c, kernel_size, padding=kernel_size // 2, stride=2)
+                )
+            else:
+                layers.append(nn.Conv1d(in_c, out_c, kernel_size, padding=kernel_size // 2))
+            layers.append(nn.BatchNorm1d(out_c))
+            layers.append(nn.ReLU())
+            if downsample == "maxpool":
+                layers.append(nn.MaxPool1d(2))
+            layers.append(nn.Dropout(conv_dropout))
+            return layers
+
+        channels = [1] + [base_channels * (2**i) for i in range(n_conv_layers)]
+        blocks = []
+        for in_c, out_c in zip(channels[:-1], channels[1:]):
+            blocks += conv_block(in_c, out_c)
+        self.convolutions = nn.Sequential(*blocks)
+
+        out_channels = channels[-1]
+        n_steps = window_len // (2**n_conv_layers)
+
+        if use_attention:
+            self.attention = nn.MultiheadAttention(
+                embed_dim=out_channels, num_heads=num_heads, dropout=attn_dropout, batch_first=True
+            )
+            self.norm = nn.LayerNorm(out_channels)
+
+        if head == "gap":
+            self.pool = nn.AdaptiveAvgPool1d(1)
+            flat_dim = out_channels
+        else:
+            flat_dim = out_channels * n_steps
 
         self.linears = nn.Sequential(
-            nn.Linear(64 * 8 + 4, 128),
+            nn.Linear(flat_dim + 4, 128),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(head_dropout),
             nn.Linear(128, 3),
         )
 
@@ -452,11 +481,20 @@ class CNN(nn.Module):
                 nn.init.zeros_(layer.bias)
 
     def forward(self, X, rr):
-        out = self.convolutions(X)
-        out = out.permute(0, 2, 1)
-        attn_out, _ = self.attention(out, out, out)
-        out = self.norm(out + attn_out)
-        out = torch.cat([out.flatten(1), rr], dim=1)
+        out = self.convolutions(X)  # (B, C, n_steps)
+        out = out.permute(0, 2, 1)  # (B, n_steps, C)
+
+        if self.use_attention:
+            attn_out, _ = self.attention(out, out, out)
+            out = self.norm(out + attn_out)
+
+        if self.head == "gap":
+            out = out.permute(0, 2, 1)
+            out = self.pool(out).squeeze(-1)
+        else:
+            out = out.flatten(1)
+
+        out = torch.cat([out, rr], dim=1)
         return self.linears(out)
 
 
