@@ -54,7 +54,7 @@ def train_model(
             empirical_risk += loss.item()
 
         empirical_risk /= len(train_dl)
-        # print(f"Epoch [{epoch + 1}/{epochs}] | Train loss: {empirical_risk:.4f}")
+        print(f"Epoch [{epoch + 1}/{epochs}] | Train loss: {empirical_risk:.4f}")
         if log_iter_metrics:
             logger.log_metrics({"train/loss": empirical_risk}, step=epoch)
         if val_dl is not None and (epoch + 1) % val_period == 0:
