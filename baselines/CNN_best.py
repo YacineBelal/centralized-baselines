@@ -4,7 +4,6 @@ from sklearn.utils.class_weight import compute_class_weight
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import optuna
 
 from baselines.data import MitbihDataset, load_mit_bih
 from baselines.models import (
@@ -19,19 +18,20 @@ def main(
     dataset_name="MIT-BIH",
     model_name="CNN",
     window_len=128,
-    epochs=30,
+    epochs=50,
     batch_size=128,
-    lr=0.001,
-    mode="design",
-    val_size=0.1,
-    val_period=5,
+    lr=0.0001,
+    mode="test",
     log_to_mlflow=True,
     seed=42,
 ):
     init_randomized_envs(seed)
     DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    dataset = load_mit_bih(val_size=val_size, mode=mode)
+    dataset = load_mit_bih(
+        mode=mode,
+        window_len=128
+    )
 
     train_dl = DataLoader(MitbihDataset(*dataset["train"]), batch_size=batch_size, shuffle=True)
 
@@ -41,17 +41,24 @@ def main(
         shuffle=False,
     )
 
-    LOGGER = MLFlowLogger(
-        enabled=log_to_mlflow, experiment_name=f"{dataset_name}/{model_name}_{mode}"
-    )
+    LOGGER = MLFlowLogger(enabled=log_to_mlflow, experiment_name=f"{dataset_name}/{mode}")
 
-    with LOGGER.start_run():
-        model = build_model(name=model_name, matched_filters=dataset["matched_filters"]).to(DEVICE)
+    run_name = f"{model_name}"
+    with LOGGER.start_run(run_name=run_name):
+        model = build_model(
+            name=model_name,
+            n_conv_layers=4,
+            base_channels=32,
+            kernel_size=7,
+            use_attention=True,
+            downsample="stride",
+            head="flatten",
+        ).to(DEVICE)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         classes = np.array(list(dataset["label_encoder"].values()))
         weights = compute_class_weight("balanced", classes=classes, y=dataset["train"][-1])
         weights = torch.Tensor(weights).to(DEVICE)
-        criterion = nn.CrossEntropyLoss(weight=weights, reduction="sum")
+        criterion = nn.CrossEntropyLoss(weight=weights)
         LOGGER.log_params(
             {
                 "window_len": window_len,
@@ -59,8 +66,6 @@ def main(
                 "lr": lr,
                 "criterion": criterion.__class__.__name__,
                 "optimizer": optimizer.__class__.__name__,
-                "val_size": val_size,
-                "mode": mode,
             }
         )
 
@@ -79,7 +84,7 @@ def main(
                 LOGGER,
                 dataset["label_encoder"],
                 val_dl=val_dl,
-                val_period=val_period,
+                log_iter_metrics=True,
                 device=DEVICE,
             )
         else:
@@ -91,6 +96,7 @@ def main(
                 epochs,
                 LOGGER,
                 dataset["label_encoder"],
+                log_iter_metrics=True,
                 device=DEVICE,
             )
 
@@ -107,10 +113,7 @@ def main(
         print(test_metrics)
         LOGGER.log_metrics(test_metrics)
         LOGGER.log_text(str(model), "architecture.txt")
-        LOGGER.set_tags({"model_type": model_name, "dataset": "MIT-BIH"})
 
 
 if __name__ == "__main__":
     fire.Fire(main)
-
-
