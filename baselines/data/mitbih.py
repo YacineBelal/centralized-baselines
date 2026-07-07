@@ -32,11 +32,11 @@ def load_mit_bih(
     window_len=64,
     val_size=0.1,
     preprocess=False,
-    target_frequency=128,
+    target_frequency=None,
     mode="design",
     k_folds=None,
 ):
-    assert mode in ("design", "CV", "final")
+    assert mode in ("design", "CV", "test")
 
     X_all, y_all, SYM_all, RR_all = _load_mit_bih(window_len, preprocess, target_frequency)
 
@@ -131,7 +131,7 @@ def _preprocess_ecg(signal: np.ndarray) -> np.ndarray:
     return signal
 
 
-def _load_mit_bih(window_len, preprocess, target_frequency, extension="atr"):
+def _load_mit_bih(window_len, preprocess, target_frequency=None, extension="atr"):
     PACED_RECORDS = {"102", "104", "107", "217"}
     files = [f for f in PROJECT_ROOT.iterdir() if f.is_file() and f.suffix == ".hea"]
     y_all = {}
@@ -139,28 +139,31 @@ def _load_mit_bih(window_len, preprocess, target_frequency, extension="atr"):
     SYM_all = {}
     RR_all = {}
 
-    g = gcd(FS, target_frequency)
-    up = target_frequency // g
-    down = FS // g
+    if target_frequency is not None:
+        g = gcd(FS, target_frequency)
+        up = target_frequency // g
+        down = FS // g
+    else:
+        target_frequency = FS  # so downstream RR/time calcs still work correctly
 
     half_window_len = window_len // 2
     beat_symbols = list(AAMI_MAP.keys())
-
     for f in files:
         if f.stem in PACED_RECORDS:
             continue
-
         record = wfdb.rdrecord(record_name=f.with_suffix(""))
         annotation = wfdb.rdann(record_name=str(f.with_suffix("")), extension=extension)
 
-        resampled_signal = resample_poly(record.p_signal[:, 0], up, down)
+        if target_frequency != FS:
+            resampled_signal = resample_poly(record.p_signal[:, 0], up, down)
+        else:
+            resampled_signal = record.p_signal[:, 0]
+
         clean_signal = _preprocess_ecg(resampled_signal) if preprocess else resampled_signal
         resampled_sig_len = len(clean_signal)
-
         resampled_samples = np.round(np.array(annotation.sample) * (target_frequency / FS)).astype(
             int
         )
-
         in_flutter = False
         in_flutter_indices = set()
         for i, sym in enumerate(annotation.symbol):

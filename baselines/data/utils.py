@@ -140,7 +140,7 @@ def aami_split(mode="design", val_size=0.2, rng=None):
     Returns
     -------
     design : DataSplit(train, val, test)
-    final  : DataSplit(train, test)
+    test  : DataSplit(train, test)
     """
 
     DS1 = {
@@ -199,7 +199,7 @@ def aami_split(mode="design", val_size=0.2, rng=None):
     if rng is not None:
         train_records = rng.permutation(train_records).tolist()
 
-    if mode == "final" or mode == "CV":
+    if mode == "test" or mode == "CV":
         return DataSplit(train=train_records, test=test_records)
 
     n_val = max(1, int(len(train_records) * val_size))
@@ -213,18 +213,18 @@ def aami_split(mode="design", val_size=0.2, rng=None):
 
 def patient_leave_out_split(nb_patient, mode="design", test_size=0.2, val_size=0.1, rng=None):
     """
-    Split patient indices into train/test (final mode) or train/val/test (design mode).
+    Split patient indices into train/test (test mode) or train/val/test (design mode).
 
     Returns
     -------
     design : (train, val, test)
-    final  : (train, test)
+    test  : (train, test)
     """
     indices = np.arange(nb_patient)
     if rng is not None:
         indices = rng.permutation(indices)
     n_test = max(1, int(nb_patient * test_size))
-    if mode == "final":
+    if mode == "test":
         return DataSplit(indices[n_test:], indices[:n_test])
 
     n_val = max(1, int(val_size * nb_patient))
